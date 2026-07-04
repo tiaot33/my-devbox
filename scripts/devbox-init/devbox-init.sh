@@ -316,7 +316,7 @@ fi
 OPTIONAL_PACKAGES=(
   tree neovim fzf ripgrep fd-find
   bat shellcheck shfmt direnv
-  btop ncdu duf dust git-delta neofetch
+  btop ncdu duf du-dust git-delta fastfetch
 )
 step "安装可选包 (${#OPTIONAL_PACKAGES[@]} 个) ..."
 apt_install_optional "${OPTIONAL_PACKAGES[@]}"
@@ -548,6 +548,9 @@ export LANG=${LANG:-en_US.UTF-8}
 export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 export XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}
 export XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
+if [[ -z ${TERM:-} || ${TERM:-} == dumb ]]; then
+  export TERM=xterm-256color
+fi
 export PATH="$HOME/.local/bin:$HOME/.atuin/bin:$PATH"
 
 if command -v nvim >/dev/null 2>&1; then
@@ -635,8 +638,8 @@ fi
 # ── SSH 登录 ─────────────────────────────────────────────────────────────────
 
 if [[ -n ${SSH_CONNECTION-} ]]; then
-  if command -v neofetch >/dev/null 2>&1; then
-    neofetch
+  if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch
   fi
 fi
 
