@@ -21,21 +21,18 @@ usage() {
   API Server 端口，默认 8642
   Dashboard 监听地址，默认 127.0.0.1，可选 127.0.0.1 / 0.0.0.0
   Dashboard 端口，默认 9119
-  Python 版本，默认 3.14
-  Node.js 版本，默认 26，可选 26 / lts / latest
 EOF
 }
 
 TARGET_HOME="/root"
 HERMES_HOME="$TARGET_HOME/.hermes"
-HERMES_AGENT_DIR="$HERMES_HOME/hermes-agent"
+HERMES_AGENT_DIR="/usr/local/lib/hermes-agent"
+HERMES_BIN="/usr/local/bin/hermes"
 HERMES_API_HOST=""
 HERMES_API_PORT=""
 HERMES_DASHBOARD_HOST=""
 HERMES_DASHBOARD_PORT=""
-PYTHON_VERSION=""
-NODE_VERSION=""
-export PATH="$TARGET_HOME/.local/bin:$PATH"
+export PATH="/usr/local/bin:$TARGET_HOME/.local/bin:$PATH"
 
 SUMMARY_INSTALLED=()
 SUMMARY_SKIPPED=()
@@ -138,42 +135,12 @@ prompt_port() {
   done
 }
 
-prompt_python_version() {
-  local value
-  while true; do
-    value="$(prompt_value "Python 版本" "3.14")"
-    if [[ "$value" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]]; then
-      printf '%s\n' "$value"
-      return 0
-    fi
-    warn "Python 版本格式应类似 3.14 或 3.13"
-  done
-}
-
-prompt_node_version() {
-  local value
-  while true; do
-    value="$(prompt_value "Node.js 版本 (26/lts/latest)" "26")"
-    case "$value" in
-      26|lts|latest)
-        printf '%s\n' "$value"
-        return 0
-        ;;
-      *)
-        warn "Node.js 版本只支持: 26 / lts / latest"
-        ;;
-    esac
-  done
-}
-
 configure_interactively() {
   log "交互配置"
   HERMES_API_HOST="$(prompt_listen_host "API Server 监听地址" "1")"
   HERMES_API_PORT="$(prompt_port "API Server 端口" "8642")"
   HERMES_DASHBOARD_HOST="$(prompt_listen_host "Dashboard 监听地址" "1")"
   HERMES_DASHBOARD_PORT="$(prompt_port "Dashboard 端口" "9119")"
-  PYTHON_VERSION="$(prompt_python_version)"
-  NODE_VERSION="$(prompt_node_version)"
 }
 
 summary_add() {
@@ -206,158 +173,36 @@ apt_install_required() {
   return 1
 }
 
-apt_install_optional() {
-  local pkg
-  for pkg in "$@"; do
-    if dpkg -s "$pkg" >/dev/null 2>&1; then
-      summary_add skipped "$pkg 已安装"
-      continue
-    fi
-
-    if apt-get install -y --no-install-recommends "$pkg"; then
-      summary_add installed "$pkg"
-    else
-      summary_add failed "$pkg 安装失败"
-      warn "跳过安装: $pkg"
-    fi
-  done
-}
-
-ensure_user_bin() {
-  mkdir -p "$TARGET_HOME/.local/bin"
-}
-
-link_if_executable() {
-  local src="$1" dest="$2"
-  [ -x "$src" ] || return 0
-
-  ln -sf "$src" "$dest"
-  summary_add installed "$dest -> $src"
-}
-
 download() {
   curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-connrefused "$1" -o "$2" && [ -s "$2" ]
 }
 
-download_and_run() {
-  local name="$1" url="$2" interp="$3"
-  shift 3
-  local tmp status
-  tmp=$(mktemp /tmp/hermes-init.XXXXXX) || {
-    warn "$name: mktemp 失败"
-    return 1
-  }
-
-  if ! download "$url" "$tmp"; then
-    rm -f "$tmp"
-    warn "$name: 下载失败"
-    return 1
-  fi
-
-  if "$interp" "$tmp" "$@"; then
-    status=0
+resolve_hermes_bin() {
+  if [ -x /usr/local/bin/hermes ]; then
+    HERMES_BIN="/usr/local/bin/hermes"
+    HERMES_AGENT_DIR="/usr/local/lib/hermes-agent"
+  elif [ -x "$TARGET_HOME/.local/bin/hermes" ]; then
+    HERMES_BIN="$TARGET_HOME/.local/bin/hermes"
+    HERMES_AGENT_DIR="$HERMES_HOME/hermes-agent"
+    warn "检测到既有用户级 Hermes 安装，官方安装器沿用: $HERMES_AGENT_DIR"
   else
-    status=$?
+    warn "找不到 hermes 命令，后续服务可能无法启动"
   fi
-
-  rm -f "$tmp"
-  return "$status"
 }
 
-install_uv() {
-  step "安装 uv ..."
-  download_and_run "uv" "https://astral.sh/uv/install.sh" sh
-  export PATH="$TARGET_HOME/.local/bin:$PATH"
-  command -v uv >/dev/null 2>&1
+env_get() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 0
+  awk -F= -v key="$key" '$1 == key { value = substr($0, length(key) + 2) } END { print value }' "$file"
 }
 
-install_node() {
-  local arch node_arch index selected version archive url install_dir tmpdir
-
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64|amd64) node_arch="x64" ;;
-    aarch64|arm64) node_arch="arm64" ;;
-    armv7l) node_arch="armv7l" ;;
-    *)
-      warn "Node.js: 不支持的架构 $arch"
-      return 1
-      ;;
-  esac
-
-  step "解析 Node.js 版本 ($NODE_VERSION) ..."
-  index="$(mktemp /tmp/node-index.XXXXXX)" || return 1
-  if ! download "https://nodejs.org/dist/index.json" "$index"; then
-    rm -f "$index"
-    warn "Node.js: 版本索引下载失败"
-    return 1
+env_set() {
+  local file="$1" key="$2" value="$3"
+  if grep -qE "^${key}=" "$file" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    printf '%s=%s\n' "$key" "$value" >>"$file"
   fi
-
-  selected="$(NODE_VERSION="$NODE_VERSION" python3 - "$index" <<'PY'
-import json
-import os
-import sys
-
-target = os.environ["NODE_VERSION"]
-with open(sys.argv[1], encoding="utf-8") as f:
-    releases = json.load(f)
-
-if target == "26":
-    match = next((r for r in releases if r["version"].startswith("v26.")), None)
-elif target == "lts":
-    match = next((r for r in releases if r.get("lts")), None)
-elif target == "latest":
-    match = releases[0] if releases else None
-else:
-    match = None
-
-if not match:
-    raise SystemExit(1)
-
-print(match["version"])
-PY
-  )" || {
-    rm -f "$index"
-    warn "Node.js: 找不到匹配版本 $NODE_VERSION"
-    return 1
-  }
-  rm -f "$index"
-
-  version="${selected#v}"
-  archive="node-v${version}-linux-${node_arch}.tar.xz"
-  url="https://nodejs.org/dist/v${version}/${archive}"
-  tmpdir="$(mktemp -d /tmp/node-install.XXXXXX)" || return 1
-
-  step "下载 Node.js v$version ($node_arch) ..."
-  if ! download "$url" "$tmpdir/$archive"; then
-    rm -rf "$tmpdir"
-    warn "Node.js: 下载失败 $url"
-    return 1
-  fi
-
-  step "安装 Node.js 到 /usr/local/lib/nodejs ..."
-  mkdir -p /usr/local/lib/nodejs
-  tar -xJf "$tmpdir/$archive" -C /usr/local/lib/nodejs
-  install_dir="/usr/local/lib/nodejs/node-v${version}-linux-${node_arch}"
-  ln -sf "$install_dir/bin/node" /usr/local/bin/node
-  ln -sf "$install_dir/bin/npm" /usr/local/bin/npm
-  ln -sf "$install_dir/bin/npx" /usr/local/bin/npx
-  [ -x "$install_dir/bin/corepack" ] && ln -sf "$install_dir/bin/corepack" /usr/local/bin/corepack
-  rm -rf "$tmpdir"
-
-  npm config set prefix /usr/local --global
-  command -v corepack >/dev/null 2>&1 && corepack enable || true
-  node --version
-  npm --version
-}
-
-install_python_tools() {
-  step "安装 Python 运行时 ..."
-  export PATH="$TARGET_HOME/.local/bin:$PATH"
-  uv python install "$PYTHON_VERSION"
-
-  step "安装 Python 工具链 (ruff) ..."
-  uv tool install ruff || true
 }
 
 write_service_environment() {
@@ -365,8 +210,7 @@ write_service_environment() {
   cat >/etc/default/hermes <<EOF
 HOME=/root
 HERMES_HOME=$HERMES_HOME
-PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-UV_CACHE_DIR=/root/.cache/uv
+PATH=/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 EOF
 }
 
@@ -402,10 +246,9 @@ install_hermes_agent() {
   step "执行 Hermes Agent installer ..."
   export HOME=/root
   export HERMES_HOME
-  export PATH="/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-  export UV_CACHE_DIR=/root/.cache/uv
+  export PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
   export npm_config_yes=true
-  if bash "$installer" --skip-setup --hermes-home "$HERMES_HOME" --dir "$HERMES_AGENT_DIR"; then
+  if bash "$installer" --skip-setup --hermes-home "$HERMES_HOME"; then
     status=0
   else
     status=$?
@@ -415,16 +258,19 @@ install_hermes_agent() {
 }
 
 configure_api_server() {
-  local api_key
+  local env_file api_key
   mkdir -p "$HERMES_HOME"
-  api_key="$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | cut -c1-32)"
-  cat >"$HERMES_HOME/.env" <<EOF
-API_SERVER_ENABLED=true
-API_SERVER_HOST=$HERMES_API_HOST
-API_SERVER_PORT=$HERMES_API_PORT
-API_SERVER_KEY=$api_key
-EOF
-  chmod 600 "$HERMES_HOME/.env"
+  env_file="$HERMES_HOME/.env"
+  touch "$env_file"
+  api_key="$(env_get "$env_file" API_SERVER_KEY)"
+  if [ -z "$api_key" ]; then
+    api_key="$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | cut -c1-32)"
+  fi
+  env_set "$env_file" API_SERVER_ENABLED true
+  env_set "$env_file" API_SERVER_HOST "$HERMES_API_HOST"
+  env_set "$env_file" API_SERVER_PORT "$HERMES_API_PORT"
+  env_set "$env_file" API_SERVER_KEY "$api_key"
+  chmod 600 "$env_file"
 }
 
 create_dashboard_service() {
@@ -439,7 +285,7 @@ Wants=network-online.target
 Type=simple
 UMask=0077
 WorkingDirectory=/root
-ExecStart=/root/.local/bin/hermes dashboard --host $HERMES_DASHBOARD_HOST --port $HERMES_DASHBOARD_PORT --no-open
+ExecStart=$HERMES_BIN dashboard --host $HERMES_DASHBOARD_HOST --port $HERMES_DASHBOARD_PORT --no-open
 EnvironmentFile=/etc/default/hermes
 Restart=on-failure
 RestartSec=5
@@ -456,12 +302,12 @@ EOF
 
 create_setup_helper() {
   step "写入 /usr/bin/hermes-setup ..."
-  cat >/usr/bin/hermes-setup <<'SETUP'
+  cat >/usr/bin/hermes-setup <<SETUP
 #!/usr/bin/env bash
 set -a
 . /etc/default/hermes
 set +a
-/root/.local/bin/hermes setup
+$HERMES_BIN setup
 chmod 700 /root/.hermes 2>/dev/null || true
 if systemctl --user list-unit-files hermes-gateway.service >/dev/null 2>&1; then
   systemctl --user enable --now hermes-gateway || true
@@ -482,7 +328,7 @@ HINT
 printf '\033[1;37m\n'
 printf '  ╔════════════════════════════════════════════════════╗\n'
 printf '  ║  %-50s  ║\n' "Hermes 初始化"
-printf '  ║  %-50s  ║\n' "   依赖 · Node · uv · Agent · systemd"
+printf '  ║  %-50s  ║\n' "   依赖 · 官方安装器 · systemd"
 printf '  ╚════════════════════════════════════════════════════╝\n'
 printf '\033[0m'
 
@@ -495,9 +341,8 @@ step "apt-get update ..."
 apt-get update
 
 HERMES_REQUIRED_PACKAGES=(
-  ca-certificates curl git openssh-client procps
-  gcc g++ make cmake libffi-dev xz-utils
-  openssl
+  ca-certificates curl git openssh-client
+  openssl sed mawk xz-utils
 )
 
 log "Hermes 必需依赖"
@@ -505,70 +350,15 @@ step "安装 ${#HERMES_REQUIRED_PACKAGES[@]} 个必需包 ..."
 apt_install_required "${HERMES_REQUIRED_PACKAGES[@]}" || exit 1
 ok "Hermes 必需依赖安装完成"
 
-BASIC_PACKAGES=(
-  jq wget unzip zip tar gzip bzip2 file less
-  vim nano
-  iproute2 iputils-ping dnsutils net-tools
-  rsync
-)
-
-log "命令行工具"
-step "安装 ${#BASIC_PACKAGES[@]} 个软件包 ..."
-apt_install_optional "${BASIC_PACKAGES[@]}"
-ok "命令行工具安装完成"
-
-PERF_PACKAGES=(
-  ripgrep fd-find hyperfine
-)
-
-log "ripgrep / fd-find / hyperfine"
-step "安装 ${#PERF_PACKAGES[@]} 个软件包 ..."
-apt_install_optional "${PERF_PACKAGES[@]}"
-
-ensure_user_bin
-link_if_executable /usr/bin/fdfind "$TARGET_HOME/.local/bin/fd"
-ok "ripgrep / fd-find / hyperfine 安装完成"
-
-log "uv"
-if install_uv; then
-  summary_add installed "uv"
-  ok "uv 安装完成"
-else
-  summary_add failed "uv 安装失败"
-fi
-
-log "Python"
-apt_install_required python3 || exit 1
-ok "Python 已就绪"
-
-log "Node.js"
-if install_node; then
-  summary_add installed "Node.js ($NODE_VERSION)"
-  ok "Node.js 安装完成"
-else
-  summary_add failed "Node.js 安装失败"
-  exit 1
-fi
-
-if ! command -v uv >/dev/null 2>&1; then
-  warn "Hermes Agent 依赖 uv，但当前找不到 uv"
-  summary_add failed "Hermes Agent 依赖 uv，当前找不到 uv"
-  exit 1
-fi
-
-log "Python 工具链"
-install_python_tools
-summary_add installed "Python $PYTHON_VERSION / ruff"
-ok "Python 工具链安装完成"
-
 log "服务环境"
-mkdir -p "$TARGET_HOME/.local/bin" "$TARGET_HOME/.cache/uv" "$HERMES_HOME"
+mkdir -p "$HERMES_HOME"
 chmod 700 "$HERMES_HOME"
 write_service_environment
 
 log "Hermes Agent"
 confirm_external_installer
 install_hermes_agent
+resolve_hermes_bin
 chmod 700 "$HERMES_HOME"
 git config --system --add safe.directory "$HERMES_AGENT_DIR" 2>/dev/null || true
 summary_add installed "Hermes Agent"
