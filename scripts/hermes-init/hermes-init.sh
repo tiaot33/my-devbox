@@ -17,8 +17,10 @@ usage() {
   bash hermes-init.sh
 
 启动后按提示配置:
-  API Server 监听地址，默认 127.0.0.1:8642
-  Dashboard 监听地址，默认 127.0.0.1:9119
+  API Server 监听地址，默认 127.0.0.1，可选 127.0.0.1 / 0.0.0.0
+  API Server 端口，默认 8642
+  Dashboard 监听地址，默认 127.0.0.1，可选 127.0.0.1 / 0.0.0.0
+  Dashboard 端口，默认 9119
   Python 版本，默认 3.14
   Node.js 版本，默认 26，可选 26 / lts / latest
 EOF
@@ -88,33 +90,6 @@ is_valid_port() {
   [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
 }
 
-is_valid_ipv4() {
-  local a b c d extra octet
-  IFS=. read -r a b c d extra <<EOF
-$1
-EOF
-  [ -z "${extra:-}" ] || return 1
-  for octet in "$a" "$b" "$c" "$d"; do
-    case "$octet" in
-      ''|*[!0-9]*) return 1 ;;
-    esac
-    [ "$((10#$octet))" -le 255 ] || return 1
-  done
-}
-
-is_valid_listen_address() {
-  local value="$1" host port
-  case "$value" in
-    *:*) ;;
-    *) return 1 ;;
-  esac
-
-  host="${value%:*}"
-  port="${value##*:}"
-  is_valid_ipv4 "$host" || return 1
-  is_valid_port "$port"
-}
-
 prompt_value() {
   local label="$1" default_value="$2" value
   printf '%s [%s]: ' "$label" "$default_value" >&2
@@ -126,15 +101,40 @@ prompt_value() {
   fi
 }
 
-prompt_listen_address() {
+prompt_listen_host() {
+  local label="$1" default_choice="$2" value
+  while true; do
+    printf '%s:\n' "$label" >&2
+    printf '  1) 127.0.0.1\n' >&2
+    printf '  2) 0.0.0.0\n' >&2
+    printf '请选择 [%s]: ' "$default_choice" >&2
+    IFS= read -r value || exit 1
+    [ -n "$value" ] || value="$default_choice"
+    case "$value" in
+      1)
+        printf '127.0.0.1\n'
+        return 0
+        ;;
+      2)
+        printf '0.0.0.0\n'
+        return 0
+        ;;
+      *)
+        warn "请选择 1 或 2"
+        ;;
+    esac
+  done
+}
+
+prompt_port() {
   local label="$1" default_value="$2" value
   while true; do
     value="$(prompt_value "$label" "$default_value")"
-    if is_valid_listen_address "$value"; then
+    if is_valid_port "$value"; then
       printf '%s\n' "$value"
       return 0
     fi
-    warn "格式应为 IPv4:端口，例如 $default_value；端口范围 1-65535"
+    warn "端口范围应为 1-65535"
   done
 }
 
@@ -167,17 +167,13 @@ prompt_node_version() {
 }
 
 configure_interactively() {
-  local api dashboard
   log "交互配置"
-  api="$(prompt_listen_address "API Server 监听地址" "127.0.0.1:8642")"
-  dashboard="$(prompt_listen_address "Dashboard 监听地址" "127.0.0.1:9119")"
+  HERMES_API_HOST="$(prompt_listen_host "API Server 监听地址" "1")"
+  HERMES_API_PORT="$(prompt_port "API Server 端口" "8642")"
+  HERMES_DASHBOARD_HOST="$(prompt_listen_host "Dashboard 监听地址" "1")"
+  HERMES_DASHBOARD_PORT="$(prompt_port "Dashboard 端口" "9119")"
   PYTHON_VERSION="$(prompt_python_version)"
   NODE_VERSION="$(prompt_node_version)"
-
-  HERMES_API_HOST="${api%:*}"
-  HERMES_API_PORT="${api##*:}"
-  HERMES_DASHBOARD_HOST="${dashboard%:*}"
-  HERMES_DASHBOARD_PORT="${dashboard##*:}"
 }
 
 summary_add() {
