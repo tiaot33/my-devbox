@@ -2,7 +2,7 @@
 
 Debian / Ubuntu 上的 Hermes Agent 初始化脚本。
 
-脚本面向 root 运行场景。它只安装运行官方 Hermes 安装器所需的最小系统依赖，然后调用官方安装器完成 Hermes Agent、Python、Node.js、uv、ripgrep、ffmpeg、虚拟环境和 `hermes` 命令配置。本脚本额外负责 API Server 配置、Dashboard systemd 服务和 `hermes-setup` 辅助命令。
+脚本面向 root 运行场景。它只安装运行官方 Hermes 安装器所需的最小系统依赖，然后调用官方安装器完成 Hermes Agent、Python、Node.js、uv、ripgrep、ffmpeg、虚拟环境和 `hermes` 命令配置。本脚本额外负责 API Server 配置和 `hermes-setup` 辅助命令。
 
 ## 适用环境
 
@@ -31,16 +31,14 @@ bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/t
 
 1. 检查当前用户是否为 root。
 2. 读取 `/etc/os-release`，对非推荐系统给出提示。
-3. 交互式配置 API Server 和 Dashboard 的监听地址、端口。
+3. 交互式配置 API Server，以及是否跳过浏览器安装。
 4. 执行 `apt-get update`。
 5. 安装最小系统依赖。
-6. 写入 `/etc/default/hermes`。
-7. 下载并执行 `https://hermes-agent.nousresearch.com/install.sh`。
-8. 根据官方安装器实际产物解析 `hermes` 命令路径。
-9. 更新 `/root/.hermes/.env` 中的 `API_SERVER_*` 配置。
-10. 创建并启动 `hermes-dashboard.service`。
-11. 创建 `/usr/bin/hermes-setup`，用于后续配置 model provider 和 gateway。
-12. 清理 APT 缓存。
+6. 下载并执行 `https://hermes-agent.nousresearch.com/install.sh`。
+7. 根据官方安装器实际产物解析 `hermes` 命令路径。
+8. 更新 `/root/.hermes/.env` 中的 `API_SERVER_*` 配置。
+9. 创建 `/usr/bin/hermes-setup`，用于后续配置 model provider 和 gateway。
+10. 清理 APT 缓存。
 
 ## 最小系统依赖
 
@@ -71,7 +69,7 @@ Python、Node.js、uv、ripgrep、ffmpeg、Playwright / Chromium 相关内容交
 | `hermes` 命令 | `/usr/local/bin/hermes` |
 | Hermes 数据目录 | `/root/.hermes` |
 
-如果官方安装器检测到既有 `/root/.hermes/hermes-agent` 用户级安装，可能会沿用旧布局。脚本会在安装后解析实际 `hermes` 路径，并据此写入 Dashboard service 和 `hermes-setup`。
+如果官方安装器检测到既有 `/root/.hermes/hermes-agent` 用户级安装，可能会沿用旧布局。脚本会在安装后解析实际 `hermes` 路径，并据此写入 `hermes-setup`。
 
 ## 交互式配置项
 
@@ -81,18 +79,17 @@ Python、Node.js、uv、ripgrep、ffmpeg、Playwright / Chromium 相关内容交
 | --- | --- | --- |
 | API Server 监听地址 | `127.0.0.1` | `/root/.hermes/.env` |
 | API Server 端口 | `8642` | `/root/.hermes/.env` |
-| Dashboard 监听地址 | `127.0.0.1` | `hermes-dashboard.service` |
-| Dashboard 端口 | `9119` | `hermes-dashboard.service` |
+| 跳过浏览器安装 | `N` | 选择 `y` 时向官方安装器传入 `--skip-browser` |
 
 `API_SERVER_KEY` 首次运行时自动生成；重跑脚本会复用已有 key，只更新 API Server host / port / enabled 配置，不覆盖 `.env` 中的其它 Hermes 配置。
+
+选择跳过浏览器安装时，Hermes 的浏览器自动化能力不可用。后续需要时，可按官方提示重新安装浏览器依赖，或重新运行本脚本并选择不跳过。
 
 ## 生成的文件
 
 | 文件 | 作用 |
 | --- | --- |
-| `/etc/default/hermes` | systemd 服务环境变量 |
 | `/root/.hermes/.env` | API Server 配置；保留已有其它配置 |
-| `/etc/systemd/system/hermes-dashboard.service` | Dashboard systemd 服务 |
 | `/usr/bin/hermes-setup` | 重新运行 `hermes setup` 的辅助命令 |
 | `/etc/profile.d/hermes-hint.sh` | root 登录提示 |
 
@@ -104,12 +101,6 @@ Python、Node.js、uv、ripgrep、ffmpeg、Playwright / Chromium 相关内容交
 hermes-setup
 ```
 
-查看 Dashboard 服务状态：
-
-```bash
-systemctl status hermes-dashboard
-```
-
 查看 Hermes 自检：
 
 ```bash
@@ -118,7 +109,7 @@ hermes doctor
 
 ## 边界与风险
 
-- 本脚本会运行 Hermes 官方安装器，但不会接管官方安装器内部的 Python、Node.js、uv、浏览器依赖安装策略。
-- 本脚本会创建 Dashboard systemd 服务；这部分是本脚本额外提供的，不是官方安装器默认行为。
+- 本脚本会运行 Hermes 官方安装器，但不会接管官方安装器内部的 Python、Node.js、uv、浏览器依赖安装策略；只会根据交互选择传入 `--skip-browser`。
+- 本脚本不再创建 systemd 服务；服务安装和管理交给 Hermes 官方命令处理。
 - 如果机器上已有 legacy root-user 安装，官方安装器可能沿用 `/root/.hermes/hermes-agent`，脚本会兼容该路径，但新环境建议使用官方 root 布局。
 - 本脚本会更新 `/root/.hermes/.env` 中 `API_SERVER_*` 键；其它键会保留。

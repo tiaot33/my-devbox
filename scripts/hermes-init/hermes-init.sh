@@ -19,8 +19,7 @@ usage() {
 启动后按提示配置:
   API Server 监听地址，默认 127.0.0.1，可选 127.0.0.1 / 0.0.0.0
   API Server 端口，默认 8642
-  Dashboard 监听地址，默认 127.0.0.1，可选 127.0.0.1 / 0.0.0.0
-  Dashboard 端口，默认 9119
+  是否跳过浏览器安装，默认否
 EOF
 }
 
@@ -30,8 +29,7 @@ HERMES_AGENT_DIR="/usr/local/lib/hermes-agent"
 HERMES_BIN="/usr/local/bin/hermes"
 HERMES_API_HOST=""
 HERMES_API_PORT=""
-HERMES_DASHBOARD_HOST=""
-HERMES_DASHBOARD_PORT=""
+HERMES_SKIP_BROWSER=false
 export PATH="/usr/local/bin:$TARGET_HOME/.local/bin:$PATH"
 
 SUMMARY_INSTALLED=()
@@ -135,12 +133,32 @@ prompt_port() {
   done
 }
 
+prompt_skip_browser() {
+  local value
+  while true; do
+    printf '跳过浏览器安装? [y/N]: ' >&2
+    IFS= read -r value || exit 1
+    case "$value" in
+      ''|n|N|no|NO|No)
+        printf 'false\n'
+        return 0
+        ;;
+      y|Y|yes|YES|Yes)
+        printf 'true\n'
+        return 0
+        ;;
+      *)
+        warn "请输入 y 或 n"
+        ;;
+    esac
+  done
+}
+
 configure_interactively() {
   log "交互配置"
   HERMES_API_HOST="$(prompt_listen_host "API Server 监听地址" "1")"
   HERMES_API_PORT="$(prompt_port "API Server 端口" "8642")"
-  HERMES_DASHBOARD_HOST="$(prompt_listen_host "Dashboard 监听地址" "1")"
-  HERMES_DASHBOARD_PORT="$(prompt_port "Dashboard 端口" "9119")"
+  HERMES_SKIP_BROWSER="$(prompt_skip_browser)"
 }
 
 summary_add() {
@@ -205,15 +223,6 @@ env_set() {
   fi
 }
 
-write_service_environment() {
-  step "写入 /etc/default/hermes ..."
-  cat >/etc/default/hermes <<EOF
-HOME=/root
-HERMES_HOME=$HERMES_HOME
-PATH=/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
-EOF
-}
-
 confirm_external_installer() {
   warn "即将运行第三方安装器: https://hermes-agent.nousresearch.com/install.sh"
   warn "该安装器来自外部地址。请先审阅代码，再决定是否继续。"
@@ -231,6 +240,7 @@ confirm_external_installer() {
 
 install_hermes_agent() {
   local installer status
+  local install_args=("--skip-setup" "--hermes-home" "$HERMES_HOME")
   installer=$(mktemp /tmp/hermes-installer.XXXXXX) || {
     warn "Hermes installer: mktemp 失败"
     return 1
@@ -248,7 +258,10 @@ install_hermes_agent() {
   export HERMES_HOME
   export PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
   export npm_config_yes=true
-  if bash "$installer" --skip-setup --hermes-home "$HERMES_HOME"; then
+  if [ "$HERMES_SKIP_BROWSER" = true ]; then
+    install_args+=("--skip-browser")
+  fi
+  if bash "$installer" "${install_args[@]}"; then
     status=0
   else
     status=$?
@@ -273,45 +286,12 @@ configure_api_server() {
   chmod 600 "$env_file"
 }
 
-create_dashboard_service() {
-  step "写入 hermes-dashboard.service ..."
-  cat >/etc/systemd/system/hermes-dashboard.service <<EOF
-[Unit]
-Description=Hermes Agent Web Dashboard
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-UMask=0077
-WorkingDirectory=/root
-ExecStart=$HERMES_BIN dashboard --host $HERMES_DASHBOARD_HOST --port $HERMES_DASHBOARD_PORT --no-open
-EnvironmentFile=/etc/default/hermes
-Restart=on-failure
-RestartSec=5
-ProtectProc=invisible
-ProcSubset=pid
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  systemctl daemon-reload
-  systemctl enable -q --now hermes-dashboard
-}
-
 create_setup_helper() {
   step "写入 /usr/bin/hermes-setup ..."
   cat >/usr/bin/hermes-setup <<SETUP
 #!/usr/bin/env bash
-set -a
-. /etc/default/hermes
-set +a
 $HERMES_BIN setup
 chmod 700 /root/.hermes 2>/dev/null || true
-if systemctl --user list-unit-files hermes-gateway.service >/dev/null 2>&1; then
-  systemctl --user enable --now hermes-gateway || true
-fi
 echo "Hermes setup complete."
 SETUP
   chmod +x /usr/bin/hermes-setup
@@ -328,7 +308,7 @@ HINT
 printf '\033[1;37m\n'
 printf '  ╔════════════════════════════════════════════════════╗\n'
 printf '  ║  %-50s  ║\n' "Hermes 初始化"
-printf '  ║  %-50s  ║\n' "   依赖 · 官方安装器 · systemd"
+printf '  ║  %-50s  ║\n' "   依赖 · 官方安装器 · API Server"
 printf '  ╚════════════════════════════════════════════════════╝\n'
 printf '\033[0m'
 
@@ -350,10 +330,9 @@ step "安装 ${#HERMES_REQUIRED_PACKAGES[@]} 个必需包 ..."
 apt_install_required "${HERMES_REQUIRED_PACKAGES[@]}" || exit 1
 ok "Hermes 必需依赖安装完成"
 
-log "服务环境"
+log "Hermes Home"
 mkdir -p "$HERMES_HOME"
 chmod 700 "$HERMES_HOME"
-write_service_environment
 
 log "Hermes Agent"
 confirm_external_installer
@@ -362,17 +341,15 @@ resolve_hermes_bin
 chmod 700 "$HERMES_HOME"
 git config --system --add safe.directory "$HERMES_AGENT_DIR" 2>/dev/null || true
 summary_add installed "Hermes Agent"
+if [ "$HERMES_SKIP_BROWSER" = true ]; then
+  summary_add skipped "Hermes 浏览器安装 (--skip-browser)"
+fi
 ok "Hermes Agent 安装完成"
 
 log "API Server"
 configure_api_server
 summary_add installed "API Server: $HERMES_API_HOST:$HERMES_API_PORT"
 ok "API Server 已配置: $HERMES_API_HOST:$HERMES_API_PORT"
-
-log "Dashboard Service"
-create_dashboard_service
-summary_add installed "Dashboard Service: $HERMES_DASHBOARD_HOST:$HERMES_DASHBOARD_PORT"
-ok "Dashboard Service 已启动: $HERMES_DASHBOARD_HOST:$HERMES_DASHBOARD_PORT"
 
 log "Setup Helper"
 create_setup_helper
