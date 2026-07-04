@@ -222,6 +222,58 @@ add_apt_repo() {
   ok "$name 仓库已添加"
 }
 
+install_lazygit() {
+  local arch lazygit_arch version url tmpdir archive
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64|amd64) lazygit_arch="x86_64" ;;
+    aarch64|arm64) lazygit_arch="arm64" ;;
+    armv7l|armhf) lazygit_arch="armv7" ;;
+    *)
+      warn "lazygit: 不支持的架构 $arch"
+      summary_add failed "lazygit: 不支持的架构 $arch"
+      return 1
+      ;;
+  esac
+
+  version="$(curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-connrefused \
+    https://api.github.com/repos/jesseduffield/lazygit/releases/latest |
+    sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' |
+    head -n 1)"
+  if [ -z "$version" ]; then
+    warn "lazygit: 未能获取最新版本号"
+    summary_add failed "lazygit: 未能获取最新版本号"
+    return 1
+  fi
+
+  tmpdir="$(mktemp -d /tmp/lazygit.XXXXXX)" || { warn "lazygit: mktemp 失败"; return 1; }
+  archive="$tmpdir/lazygit.tar.gz"
+  url="https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_Linux_${lazygit_arch}.tar.gz"
+
+  if ! download "$url" "$archive"; then
+    warn "lazygit: 下载失败 ($url)"
+    summary_add failed "lazygit: 下载失败"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  if ! tar -xzf "$archive" -C "$tmpdir" lazygit; then
+    warn "lazygit: 解压失败"
+    summary_add failed "lazygit: 解压失败"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  if ! $SUDO install -m 0755 "$tmpdir/lazygit" /usr/local/bin/lazygit; then
+    warn "lazygit: 写入 /usr/local/bin/lazygit 失败"
+    summary_add failed "lazygit: 写入 /usr/local/bin/lazygit 失败"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  rm -rf "$tmpdir"
+  summary_add tools "lazygit: /usr/local/bin/lazygit"
+  ok "lazygit 已安装"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 开始安装
 # ═══════════════════════════════════════════════════════════════════════════
@@ -337,6 +389,13 @@ apt_install_optional gh eza
 ok "GitHub CLI & eza 步骤完成"
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 🐙 lazygit
+# ═══════════════════════════════════════════════════════════════════════════
+log "🐙 lazygit — Git TUI"
+step "安装 lazygit 到 /usr/local/bin ..."
+install_lazygit
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 📁 用户目录 & 兼容软链接
 # ═══════════════════════════════════════════════════════════════════════════
 log "📁 用户目录 & 兼容软链接"
@@ -424,9 +483,9 @@ fi
 rm -f "$font_zip"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 🧩 终端工具 — zoxide · Atuin · ble.sh
+# 🧩 终端工具 — zoxide · Atuin · Herdr · ble.sh
 # ═══════════════════════════════════════════════════════════════════════════
-log "🧩 终端工具 — zoxide · Atuin · ble.sh"
+log "🧩 终端工具 — zoxide · Atuin · Herdr · ble.sh"
 
 step "安装 zoxide (智能 cd) ..."
 # shellcheck disable=SC2016
@@ -444,6 +503,15 @@ if download_and_run "Atuin" "https://setup.atuin.sh" sh --non-interactive &&
   summary_add tools "Atuin: 命令已检测到"
 else
   summary_add failed "Atuin: 安装后未检测到命令"
+fi
+
+step "安装 Herdr (agent multiplexer) ..."
+# shellcheck disable=SC2016
+if download_and_run "Herdr" "https://herdr.dev/install.sh" sh &&
+  $AS_USER 'test -x "$HOME/.local/bin/herdr" || command -v herdr >/dev/null 2>&1'; then
+  summary_add tools "Herdr: 命令已检测到"
+else
+  summary_add failed "Herdr: 安装后未检测到命令"
 fi
 
 step "安装 ble.sh (bash 增强) ..."
