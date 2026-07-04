@@ -92,7 +92,7 @@ sudo bash devbox-lang.sh --all
 INSTALL_NODE=0 INSTALL_PYTHON=0 INSTALL_BUN=0 INSTALL_DENO=0 bash devbox-lang.sh
 ```
 
-> 该脚本把语言工具链装入目标用户家目录，并为已安装的工具写入 bash 自动补全（`uv`/`uvx`、`fnm`、`mise`、`deno`、`npm`、`bun`，追加到 `~/.bashrc` 的 `devbox-lang: shell completions` 标记块，重跑会刷新；未安装者自动跳过）。补全块会按需把相关 bin 目录注入 `PATH`，但除此之外不写入其他 dotfiles。若未运行过 `devbox-init.sh`，安装后仍建议自行确认相应目录（如 `~/.local/bin`、`~/.local/share/fnm`、`~/go/bin`、`~/.bun/bin`、`~/.deno/bin`）已在 `PATH` 中，或重开 shell 后再验证。
+> 该脚本把语言工具链装入目标用户家目录。Node.js / Python / Go / Deno 的 shell 环境和 bash 自动补全由脚本写入 `~/.bashrc` 的 `devbox-lang: <name>` 标记块，重跑会刷新；Bun 的 shell 配置交给官方安装脚本维护。若未运行过 `devbox-init.sh`，安装后仍建议自行确认相应目录（如 `~/.local/bin`、`~/.local/share/fnm`、`~/go/bin`、`~/.bun/bin`、`~/.deno/bin`）已在 `PATH` 中，或重开 shell 后再验证。
 
 ### 环境变量开关
 

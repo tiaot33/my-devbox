@@ -445,24 +445,7 @@ if [ "${INSTALL_BUN:-1}" = "1" ]; then
   step "安装 Bun ..."
   download_and_run "Bun" "https://bun.com/install" bash
 
-  step "下载 bash 补全 ..."
-  $AS_USER 'mkdir -p "$HOME/.bun"
-    if curl --proto "=https" --tlsv1.2 -fsSL --retry 3 --retry-connrefused \
-      "https://raw.githubusercontent.com/oven-sh/bun/main/completions/bun.bash" \
-      -o "$HOME/.bun/_bun.bash" 2>/dev/null; then
-      [ -s "$HOME/.bun/_bun.bash" ]
-    else
-      false
-    fi
-  ' || warn "Bun: bash 补全下载失败"
-
-  step "写入 Bun shell 环境 ..."
-  write_bashrc_block "bun" <<'EOF_BUN_BASHRC'
-case ":$PATH:" in *":$HOME/.bun/bin:"*) ;; *) PATH="$HOME/.bun/bin:$PATH";; esac
-
-[ -s "$HOME/.bun/_bun.bash" ] && source "$HOME/.bun/_bun.bash"
-EOF_BUN_BASHRC
-  ok "Bun shell 环境已写入 ~/.bashrc"
+  ok "Bun 安装完成；shell 配置由官方安装脚本维护"
 else
   skip "Bun"
 fi
@@ -475,7 +458,7 @@ if [ "${INSTALL_DENO:-1}" = "1" ]; then
   command -v unzip >/dev/null 2>&1 || warn "unzip 未安装，Deno 安装可能失败"
 
   step "安装 Deno ..."
-  download_and_run "Deno" "https://deno.land/install.sh" sh
+  download_and_run "Deno" "https://deno.land/install.sh" sh --yes
 
   step "写入 Deno shell 环境 ..."
   write_bashrc_block "deno" <<'EOF_DENO_BASHRC'
@@ -499,8 +482,8 @@ printf '  ╚══════════════════════�
 printf '\033[0m\n'
 
 cat <<EOF_SUMMARY
-  🔧 已安装语言的环境变量和 bash 补全已写入 ~/.bashrc
-     标记块按语言拆分，例如 "devbox-lang: node"、"devbox-lang: go"
+  🔧 已安装语言的 shell 配置已写入 ~/.bashrc
+     Node.js / Python / Go / Deno 使用 devbox-lang 标记块；Bun 由官方安装脚本维护
 
   🚀 执行 \033[1msource ~/.bashrc\033[0m 或新开终端即可使用
 EOF_SUMMARY

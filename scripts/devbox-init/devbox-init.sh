@@ -560,7 +560,12 @@ else
 fi
 export VISUAL="$EDITOR"
 export PAGER=less
-export LESS='-R -F -X -i -M'
+if less --help 2>&1 | grep -q -- '--mouse'; then
+  export LESS='-R -F -X -i -M --mouse --wheel-lines=3'
+else
+  export LESS='-R -F -X -i -M'
+fi
+export BAT_PAGER=less
 if command -v batcat >/dev/null 2>&1; then
   export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
 elif command -v bat >/dev/null 2>&1; then
