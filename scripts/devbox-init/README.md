@@ -25,13 +25,13 @@ Debian / Ubuntu 无头（headless）开发环境一键初始化脚本。
 一条命令自动下载并执行：
 
 ```bash
-bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-init.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-init.sh)
 ```
 
 如果当前用户需要通过 `sudo` 安装系统包，也可以直接用：
 
 ```bash
-sudo bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-init.sh)
+sudo bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-init.sh)
 ```
 
 > 建议先打开上面的 GitHub raw 链接审阅脚本内容，再执行远程脚本。
@@ -61,13 +61,13 @@ sudo bash devbox-init.sh
 一条命令下载并进入交互式选择菜单：
 
 ```bash
-bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-lang.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-lang.sh)
 ```
 
 非交互安装全部语言环境：
 
 ```bash
-bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-lang.sh) --all
+bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/devbox-lang.sh) --all
 ```
 
 本地运行：

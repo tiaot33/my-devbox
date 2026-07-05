@@ -34,7 +34,7 @@ bash hermes-init.sh
 远程安装外部维护环境：
 
 ```bash
-bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/hermes-init/hermes-init.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/hermes-init/hermes-init.sh)
 ```
 
 安装 Hermes Agent：
@@ -46,7 +46,7 @@ bash hermes-agent-install.sh
 远程安装 Hermes Agent：
 
 ```bash
-bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/hermes-init/hermes-agent-install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/hermes-init/hermes-agent-install.sh)
 ```
 
 查看帮助：
