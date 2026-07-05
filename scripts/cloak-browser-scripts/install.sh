@@ -46,6 +46,7 @@ APP_USER="${APP_USER:-cloakbrowser}"
 APP_HOME="${APP_HOME:-/opt/cloakbrowser}"
 APP_GROUP="${APP_GROUP:-$APP_USER}"
 CLOAKSERVE_DATA_DIR_DEFAULT="${CLOAKSERVE_DATA_DIR_DEFAULT:-/var/lib/cloakbrowser/profiles}"
+CLOAKSERVE_SCRIPT_URL="${CLOAKSERVE_SCRIPT_URL:-https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/cloak-browser-scripts/cloakserve}"
 DISPLAY_NUM="${DISPLAY_NUM:-99}"
 DISPLAY_VALUE=":${DISPLAY_NUM}"
 SCREEN_GEOMETRY="${SCREEN_GEOMETRY:-1920x1080}"
@@ -158,6 +159,29 @@ prompt_yes_no() {
   esac
 }
 
+prompt_confirm() {
+  local label="$1"
+  local default_value="$2"
+  local value default_label
+
+  if [ "$default_value" = "1" ]; then
+    default_label="y"
+  else
+    default_label="n"
+  fi
+
+  if ! is_interactive; then
+    [ "$default_value" = "1" ]
+    return
+  fi
+
+  read -r -p "${label} [${default_label}]: " value
+  case "${value:-$default_label}" in
+    y|Y|yes|YES|1|true|TRUE) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 prompt_vnc_password() {
   if [ "${VNC_PASSWORD+x}" = "x" ]; then
     if [ -z "$VNC_PASSWORD" ]; then
@@ -201,6 +225,34 @@ prompt_vnc_password() {
   esac
 }
 
+prompt_cloakserve_headless() {
+  local choice default_choice
+
+  if [ "${USER_SET_CLOAKSERVE_HEADLESS:-}" = "x" ]; then
+    return
+  fi
+
+  if ! is_interactive; then
+    return
+  fi
+
+  if [ "$CLOAKSERVE_HEADLESS" = "true" ]; then
+    default_choice="2"
+  else
+    default_choice="1"
+  fi
+
+  printf '\ncloakserve browser mode:\n'
+  printf '  1) Visible on VNC (recommended for debugging)\n'
+  printf '  2) Headless\n'
+  read -r -p "Choose [${default_choice}]: " choice
+
+  case "${choice:-$default_choice}" in
+    2) CLOAKSERVE_HEADLESS="true" ;;
+    *) CLOAKSERVE_HEADLESS="false" ;;
+  esac
+}
+
 prompt_config() {
   prompt_yes_no ENABLE_CLOAKSERVE "Enable cloakserve CDP service" "$ENABLE_CLOAKSERVE"
   prompt_value VNC_BIND "VNC listen address" "$VNC_BIND"
@@ -210,14 +262,20 @@ prompt_config() {
   if [ "$ENABLE_CLOAKSERVE" = "1" ]; then
     prompt_value CDP_BIND "CDP listen address (127.0.0.1 or 0.0.0.0)" "$CDP_BIND"
     prompt_value CDP_PORT "CDP public port" "$CDP_PORT"
-    prompt_value CLOAKSERVE_HEADLESS "cloakserve headless mode (true/false)" "$CLOAKSERVE_HEADLESS"
-    prompt_optional_value CLOAKSERVE_DATA_DIR "cloakserve data dir" "$CLOAKSERVE_DATA_DIR_DEFAULT"
-    prompt_optional_value CLOAKSERVE_IDLE_TIMEOUT "cloakserve idle timeout seconds" "$CLOAKSERVE_IDLE_TIMEOUT"
-    prompt_optional_value CLOAKSERVE_FINGERPRINT "default fingerprint seed" "$CLOAKSERVE_FINGERPRINT"
-    prompt_optional_value CLOAKSERVE_LOCALE "default locale" "$CLOAKSERVE_LOCALE"
-    prompt_optional_value CLOAKSERVE_TIMEZONE "default timezone" "$CLOAKSERVE_TIMEZONE"
-    prompt_optional_value CLOAKSERVE_PROXY_SERVER "default proxy server" "$CLOAKSERVE_PROXY_SERVER"
-    prompt_optional_value CLOAKSERVE_EXTRA_ARGS "extra cloakserve/browser args" "$CLOAKSERVE_EXTRA_ARGS"
+    prompt_cloakserve_headless
+
+    if [ "${USER_SET_CLOAKSERVE_DATA_DIR:-}" != "x" ] && prompt_confirm "Use persistent cloakserve profile dir" 0; then
+      prompt_value CLOAKSERVE_DATA_DIR "cloakserve profile dir" "$CLOAKSERVE_DATA_DIR_DEFAULT"
+    fi
+
+    if prompt_confirm "Configure advanced cloakserve defaults" 0; then
+      prompt_optional_value CLOAKSERVE_IDLE_TIMEOUT "Stop idle cloakserve browsers after seconds" "$CLOAKSERVE_IDLE_TIMEOUT"
+      prompt_optional_value CLOAKSERVE_FINGERPRINT "default fingerprint seed" "$CLOAKSERVE_FINGERPRINT"
+      prompt_optional_value CLOAKSERVE_LOCALE "default locale" "$CLOAKSERVE_LOCALE"
+      prompt_optional_value CLOAKSERVE_TIMEZONE "default timezone" "$CLOAKSERVE_TIMEZONE"
+      prompt_optional_value CLOAKSERVE_PROXY_SERVER "default proxy server with GeoIP" "$CLOAKSERVE_PROXY_SERVER"
+      prompt_optional_value CLOAKSERVE_EXTRA_ARGS "extra cloakserve/browser args" "$CLOAKSERVE_EXTRA_ARGS"
+    fi
   fi
 }
 
@@ -254,6 +312,10 @@ validate_config() {
   validate_no_whitespace CLOAKSERVE_LOCALE "$CLOAKSERVE_LOCALE"
   validate_no_whitespace CLOAKSERVE_TIMEZONE "$CLOAKSERVE_TIMEZONE"
   validate_no_whitespace CLOAKSERVE_PROXY_SERVER "$CLOAKSERVE_PROXY_SERVER"
+  case "$CLOAKSERVE_HEADLESS" in
+    true|false) ;;
+    *) die "CLOAKSERVE_HEADLESS must be true or false; got ${CLOAKSERVE_HEADLESS}" ;;
+  esac
   case "$CDP_BIND" in
     127.0.0.1|localhost|0.0.0.0) ;;
     *) die "CDP_BIND must be 127.0.0.1, localhost, or 0.0.0.0; got ${CDP_BIND}" ;;
@@ -275,10 +337,6 @@ validate_config() {
   validate_no_percent SCREEN_GEOMETRY "$SCREEN_GEOMETRY"
   validate_no_percent VNC_BIND "$VNC_BIND"
   validate_no_percent VNC_PORT "$VNC_PORT"
-}
-
-cdp_public_bind_requested() {
-  [ "$ENABLE_CLOAKSERVE" = "1" ] && [ "$CDP_BIND" = "0.0.0.0" ]
 }
 
 apt_install() {
@@ -359,7 +417,7 @@ install_js_package() {
 
 install_sdist_tools() {
   log "Installing auxiliary tools from the latest PyPI sdist"
-  local tmp_dir sdist_file source_root
+  local tmp_dir sdist_file source_root script_dir local_cloakserve
 
   tmp_dir="$(mktemp -d)"
   "$APP_HOME/.venv/bin/python" -m pip download --no-binary cloakbrowser --no-deps -d "$tmp_dir" cloakbrowser
@@ -370,11 +428,18 @@ install_sdist_tools() {
   [ -n "$source_root" ] || die "failed to inspect CloakBrowser sdist"
 
   install -d -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$APP_HOME/tools/bin"
-  tar -xzf "$sdist_file" -C "$tmp_dir" \
-    "${source_root}/bin/cloakserve" \
-    "${source_root}/bin/fetch-widevine.py"
-  install -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$tmp_dir/${source_root}/bin/cloakserve" "$APP_HOME/tools/bin/cloakserve"
+  tar -xzf "$sdist_file" -C "$tmp_dir" "${source_root}/bin/fetch-widevine.py"
   install -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$tmp_dir/${source_root}/bin/fetch-widevine.py" "$APP_HOME/tools/bin/fetch-widevine.py"
+
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P || true)"
+  local_cloakserve="${script_dir}/cloakserve"
+  if [ -f "$local_cloakserve" ]; then
+    install -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$local_cloakserve" "$APP_HOME/tools/bin/cloakserve"
+  else
+    curl -fsSL "$CLOAKSERVE_SCRIPT_URL" -o "$tmp_dir/cloakserve"
+    install -m 0755 -o "$APP_USER" -g "$APP_GROUP" "$tmp_dir/cloakserve" "$APP_HOME/tools/bin/cloakserve"
+  fi
+
   rm -rf "$tmp_dir"
 }
 
@@ -392,13 +457,13 @@ EOF
 set -euo pipefail
 source /etc/cloakbrowser/cloakserve.conf
 export DISPLAY="\${DISPLAY:-${DISPLAY_VALUE}}"
-args=(--headless="\${CLOAKSERVE_HEADLESS}" --port="\${CDP_PORT}")
+args=(--headless="\${CLOAKSERVE_HEADLESS}" --host="\${CDP_BIND}" --port="\${CDP_PORT}")
 [ -n "\${CLOAKSERVE_DATA_DIR}" ] && args+=(--data-dir="\${CLOAKSERVE_DATA_DIR}")
 [ -n "\${CLOAKSERVE_IDLE_TIMEOUT}" ] && args+=(--idle-timeout="\${CLOAKSERVE_IDLE_TIMEOUT}")
 [ -n "\${CLOAKSERVE_FINGERPRINT}" ] && args+=(--fingerprint="\${CLOAKSERVE_FINGERPRINT}")
 [ -n "\${CLOAKSERVE_LOCALE}" ] && args+=(--fingerprint-locale="\${CLOAKSERVE_LOCALE}")
 [ -n "\${CLOAKSERVE_TIMEZONE}" ] && args+=(--fingerprint-timezone="\${CLOAKSERVE_TIMEZONE}")
-[ -n "\${CLOAKSERVE_PROXY_SERVER}" ] && args+=(--proxy-server="\${CLOAKSERVE_PROXY_SERVER}")
+[ -n "\${CLOAKSERVE_PROXY_SERVER}" ] && args+=(--default-proxy="\${CLOAKSERVE_PROXY_SERVER}")
 if [ -n "\${CLOAKSERVE_EXTRA_ARGS}" ]; then
   # Intentional shell splitting for advanced Chromium flags supplied by the admin.
   # shellcheck disable=SC2206
@@ -457,19 +522,11 @@ configure_vnc_password() {
   chown root:"$APP_GROUP" /etc/cloakbrowser/vnc.pass
 }
 
-configure_dockerenv_for_cdp() {
+cleanup_legacy_dockerenv_marker() {
   install -d -m 0750 -o root -g "$APP_GROUP" /etc/cloakbrowser
 
-  if cdp_public_bind_requested; then
-    log "WARNING: creating /.dockerenv so the original cloakserve listens on 0.0.0.0, like Docker."
-    log "WARNING: /.dockerenv is a system-wide container marker; other software may also treat this host as Docker."
-    touch /.dockerenv
-    touch /etc/cloakbrowser/created-dockerenv
-    return
-  fi
-
   if [ -f /etc/cloakbrowser/created-dockerenv ]; then
-    log "Removing /.dockerenv created by a previous installer run because CDP_BIND is local-only."
+    log "Removing /.dockerenv created by an older installer; cloakserve now supports --host directly."
     rm -f /.dockerenv /etc/cloakbrowser/created-dockerenv
   fi
 }
@@ -500,6 +557,7 @@ EOF
   chown root:"$APP_GROUP" /etc/cloakbrowser/env
 
   {
+    write_bash_var CDP_BIND "$CDP_BIND"
     write_bash_var CDP_PORT "$CDP_PORT"
     write_bash_var CLOAKSERVE_HEADLESS "$CLOAKSERVE_HEADLESS"
     write_bash_var CLOAKSERVE_DATA_DIR "$CLOAKSERVE_DATA_DIR"
@@ -649,6 +707,7 @@ EOF
     cat <<EOF
   bind: ${CDP_BIND}
   URL: http://${CDP_BIND}:${CDP_PORT}
+  default proxy: ${CLOAKSERVE_PROXY_SERVER:-<none>}
   note: CDP gives full browser control. Expose it only on trusted networks or behind SSH/reverse-proxy auth.
 EOF
   else
@@ -685,7 +744,7 @@ main() {
   install_sdist_tools
   install_cli_wrappers
   configure_vnc_password
-  configure_dockerenv_for_cdp
+  cleanup_legacy_dockerenv_marker
   configure_cloakserve_data_dir
   write_environment
   write_systemd_units
