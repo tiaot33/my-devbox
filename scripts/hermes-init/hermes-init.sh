@@ -16,21 +16,18 @@ usage() {
 用法:
   bash hermes-init.sh
 
-启动后按提示配置:
-  API Server 监听地址，默认 127.0.0.1，可选 127.0.0.1 / 0.0.0.0
-  API Server 端口，默认 8642
-  是否跳过浏览器安装，默认否
+安装内容:
+  基础系统工具
+  人工维护工具
+  GitHub CLI
+  uv
+  Starship
+  lazygit / lazyssh / ble.sh / btop
+  root 低侵入交互 shell 增强
 EOF
 }
 
-TARGET_HOME="/root"
-HERMES_HOME="$TARGET_HOME/.hermes"
-HERMES_AGENT_DIR="/usr/local/lib/hermes-agent"
-HERMES_BIN="/usr/local/bin/hermes"
-HERMES_API_HOST=""
-HERMES_API_PORT=""
-HERMES_SKIP_BROWSER=false
-export PATH="/usr/local/bin:$TARGET_HOME/.local/bin:$PATH"
+export PATH="/usr/local/bin:/root/.local/bin:$PATH"
 
 SUMMARY_INSTALLED=()
 SUMMARY_SKIPPED=()
@@ -78,89 +75,6 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-is_valid_port() {
-  case "$1" in
-    ''|*[!0-9]*) return 1 ;;
-  esac
-  [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
-}
-
-prompt_value() {
-  local label="$1" default_value="$2" value
-  printf '%s [%s]: ' "$label" "$default_value" >&2
-  IFS= read -r value || exit 1
-  if [ -z "$value" ]; then
-    printf '%s\n' "$default_value"
-  else
-    printf '%s\n' "$value"
-  fi
-}
-
-prompt_listen_host() {
-  local label="$1" default_choice="$2" value
-  while true; do
-    printf '%s:\n' "$label" >&2
-    printf '  1) 127.0.0.1\n' >&2
-    printf '  2) 0.0.0.0\n' >&2
-    printf '请选择 [%s]: ' "$default_choice" >&2
-    IFS= read -r value || exit 1
-    [ -n "$value" ] || value="$default_choice"
-    case "$value" in
-      1)
-        printf '127.0.0.1\n'
-        return 0
-        ;;
-      2)
-        printf '0.0.0.0\n'
-        return 0
-        ;;
-      *)
-        warn "请选择 1 或 2"
-        ;;
-    esac
-  done
-}
-
-prompt_port() {
-  local label="$1" default_value="$2" value
-  while true; do
-    value="$(prompt_value "$label" "$default_value")"
-    if is_valid_port "$value"; then
-      printf '%s\n' "$value"
-      return 0
-    fi
-    warn "端口范围应为 1-65535"
-  done
-}
-
-prompt_skip_browser() {
-  local value
-  while true; do
-    printf '跳过浏览器安装? [y/N]: ' >&2
-    IFS= read -r value || exit 1
-    case "$value" in
-      ''|n|N|no|NO|No)
-        printf 'false\n'
-        return 0
-        ;;
-      y|Y|yes|YES|Yes)
-        printf 'true\n'
-        return 0
-        ;;
-      *)
-        warn "请输入 y 或 n"
-        ;;
-    esac
-  done
-}
-
-configure_interactively() {
-  log "交互配置"
-  HERMES_API_HOST="$(prompt_listen_host "API Server 监听地址" "1")"
-  HERMES_API_PORT="$(prompt_port "API Server 端口" "8642")"
-  HERMES_SKIP_BROWSER="$(prompt_skip_browser)"
-}
-
 summary_add() {
   local section="$1" item="$2"
   case "$section" in
@@ -181,192 +95,513 @@ summary_print_list() {
   printf '\n'
 }
 
+print_summary() {
+  summary_print_list "已安装 / 已配置" "${SUMMARY_INSTALLED[@]}"
+  summary_print_list "已跳过" "${SUMMARY_SKIPPED[@]}"
+  summary_print_list "失败项" "${SUMMARY_FAILED[@]}"
+}
+
 apt_install_required() {
+  local label="$1"
+  shift
   if apt-get install -y --no-install-recommends "$@"; then
-    summary_add installed "Hermes 必需依赖：$*"
+    summary_add installed "$label：$*"
     return 0
   fi
 
-  summary_add failed "Hermes 必需依赖安装失败：$*"
+  summary_add failed "$label 安装失败：$*"
   return 1
+}
+
+write_root_file() {
+  local dest="$1" mode="${2:-0644}" tmp
+  tmp="$(mktemp)" || {
+    warn "$dest: mktemp 失败"
+    summary_add failed "$dest: mktemp 失败"
+    return 1
+  }
+  cat >"$tmp"
+  if install -m "$mode" "$tmp" "$dest"; then
+    summary_add installed "$dest"
+  else
+    warn "$dest: 写入失败"
+    summary_add failed "$dest: 写入失败"
+  fi
+  rm -f "$tmp"
 }
 
 download() {
   curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-connrefused "$1" -o "$2" && [ -s "$2" ]
 }
 
-resolve_hermes_bin() {
-  if [ -x /usr/local/bin/hermes ]; then
-    HERMES_BIN="/usr/local/bin/hermes"
-    HERMES_AGENT_DIR="/usr/local/lib/hermes-agent"
-  elif [ -x "$TARGET_HOME/.local/bin/hermes" ]; then
-    HERMES_BIN="$TARGET_HOME/.local/bin/hermes"
-    HERMES_AGENT_DIR="$HERMES_HOME/hermes-agent"
-    warn "检测到既有用户级 Hermes 安装，官方安装器沿用: $HERMES_AGENT_DIR"
-  else
-    warn "找不到 hermes 命令，后续服务可能无法启动"
+skip_if_command_exists() {
+  local label="$1" command_name="$2" command_path
+  if command_path="$(command -v "$command_name" 2>/dev/null)"; then
+    skip "$label 已安装: $command_path"
+    summary_add skipped "$label: $command_path (已安装，未改动)"
+    return 0
   fi
+  return 1
 }
 
-env_get() {
-  local file="$1" key="$2"
-  [ -f "$file" ] || return 0
-  awk -F= -v key="$key" '$1 == key { value = substr($0, length(key) + 2) } END { print value }' "$file"
-}
+add_github_cli_repo() {
+  local arch list key_dest
+  list="/etc/apt/sources.list.d/github-cli.list"
+  key_dest="/etc/apt/keyrings/githubcli-archive-keyring.gpg"
 
-env_set() {
-  local file="$1" key="$2" value="$3"
-  if grep -qE "^${key}=" "$file" 2>/dev/null; then
-    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
-  else
-    printf '%s=%s\n' "$key" "$value" >>"$file"
+  if ! arch="$(dpkg --print-architecture)"; then
+    warn "GitHub CLI: 无法识别系统架构"
+    summary_add failed "GitHub CLI APT 仓库: 无法识别系统架构"
+    return 1
   fi
+
+  if [ -f "$list" ]; then
+    skip "GitHub CLI 仓库已存在"
+    summary_add skipped "$list (仓库已存在，未改动)"
+    return 0
+  fi
+
+  if ! install -m 0755 -d /etc/apt/keyrings; then
+    warn "GitHub CLI: /etc/apt/keyrings 创建失败"
+    summary_add failed "GitHub CLI APT 仓库: /etc/apt/keyrings 创建失败"
+    return 1
+  fi
+  summary_add installed "/etc/apt/keyrings"
+
+  if ! download "https://cli.github.com/packages/githubcli-archive-keyring.gpg" "$key_dest"; then
+    warn "GitHub CLI: 密钥下载失败"
+    summary_add failed "GitHub CLI APT 仓库: 密钥下载失败"
+    return 1
+  fi
+  chmod 0644 "$key_dest"
+
+  if ! printf 'deb [arch=%s signed-by=%s] https://cli.github.com/packages stable main\n' "$arch" "$key_dest" >"$list"; then
+    warn "GitHub CLI: source list 写入失败"
+    summary_add failed "GitHub CLI APT 仓库: source list 写入失败"
+    return 1
+  fi
+
+  summary_add installed "$key_dest"
+  summary_add installed "$list"
+  ok "GitHub CLI 仓库已添加"
 }
 
-confirm_external_installer() {
-  warn "即将运行第三方安装器: https://hermes-agent.nousresearch.com/install.sh"
-  warn "该安装器来自外部地址。请先审阅代码，再决定是否继续。"
-  printf '继续安装 Hermes Agent? [y/N]: '
-  local confirm
-  IFS= read -r confirm || exit 1
-  case "$confirm" in
-    y|Y|yes|YES|Yes) ;;
-    *)
-      printf '已取消安装。\n'
-      exit 10
-      ;;
-  esac
+install_github_cli() {
+  if skip_if_command_exists "GitHub CLI" gh; then
+    return 0
+  fi
+
+  add_github_cli_repo || return 1
+
+  step "apt-get update ..."
+  if ! apt-get update; then
+    warn "GitHub CLI: apt-get update 失败"
+    summary_add failed "GitHub CLI: apt-get update 失败"
+    return 1
+  fi
+
+  if apt-get install -y --no-install-recommends gh; then
+    summary_add installed "GitHub CLI: gh"
+    return 0
+  fi
+
+  warn "GitHub CLI: gh 安装失败"
+  summary_add failed "GitHub CLI: gh 安装失败"
+  return 1
 }
 
-install_hermes_agent() {
-  local installer status
-  local install_args=("--skip-setup" "--hermes-home" "$HERMES_HOME")
-  installer=$(mktemp /tmp/hermes-installer.XXXXXX) || {
-    warn "Hermes installer: mktemp 失败"
+install_uv() {
+  local uv_tmp
+  if skip_if_command_exists "uv" uv; then
+    return 0
+  fi
+
+  uv_tmp="$(mktemp /tmp/uv-installer.XXXXXX)" || {
+    warn "uv: mktemp 失败"
+    summary_add failed "uv: mktemp 失败"
     return 1
   }
 
-  step "下载 Hermes Agent installer ..."
-  if ! download "https://hermes-agent.nousresearch.com/install.sh" "$installer"; then
-    rm -f "$installer"
-    warn "Hermes Agent installer 下载失败"
+  if download "https://astral.sh/uv/install.sh" "$uv_tmp"; then
+    step "安装 uv 到 /usr/local/bin ..."
+    if UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh "$uv_tmp"; then
+      if command -v uv >/dev/null 2>&1; then
+        summary_add installed "uv: $(command -v uv)"
+      else
+        summary_add installed "uv: 安装器执行成功，当前 PATH 未检测到 uv"
+      fi
+      rm -f "$uv_tmp"
+      return 0
+    fi
+    warn "uv 安装失败"
+    summary_add failed "uv: 安装失败"
+  else
+    warn "uv: 下载失败"
+    summary_add failed "uv: 下载失败"
+  fi
+
+  rm -f "$uv_tmp"
+  return 1
+}
+
+install_starship() {
+  local starship_tmp
+  if skip_if_command_exists "Starship" starship; then
+    return 0
+  fi
+
+  starship_tmp="$(mktemp /tmp/starship-installer.XXXXXX)" || {
+    warn "Starship: mktemp 失败"
+    summary_add failed "Starship: mktemp 失败"
+    return 1
+  }
+
+  if download "https://starship.rs/install.sh" "$starship_tmp"; then
+    step "安装 Starship 到 /usr/local/bin ..."
+    if sh "$starship_tmp" -y -b /usr/local/bin; then
+      if command -v starship >/dev/null 2>&1; then
+        summary_add installed "Starship: $(command -v starship)"
+      else
+        summary_add installed "Starship: 安装器执行成功，当前 PATH 未检测到 starship"
+      fi
+      rm -f "$starship_tmp"
+      return 0
+    fi
+    warn "Starship 安装失败"
+    summary_add failed "Starship: 安装失败"
+  else
+    warn "Starship: 下载失败"
+    summary_add failed "Starship: 下载失败"
+  fi
+
+  rm -f "$starship_tmp"
+  return 1
+}
+
+install_lazygit() {
+  local arch lazygit_arch version url tmpdir archive
+  if skip_if_command_exists "lazygit" lazygit; then
+    return 0
+  fi
+
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64 | amd64) lazygit_arch="x86_64" ;;
+    aarch64 | arm64) lazygit_arch="arm64" ;;
+    armv7l | armhf) lazygit_arch="armv7" ;;
+    *)
+      warn "lazygit: 不支持的架构 $arch"
+      summary_add failed "lazygit: 不支持的架构 $arch"
+      return 1
+      ;;
+  esac
+
+  version="$(curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-connrefused \
+    https://api.github.com/repos/jesseduffield/lazygit/releases/latest |
+    sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' |
+    head -n 1)"
+  if [ -z "$version" ]; then
+    warn "lazygit: 未能获取最新版本号"
+    summary_add failed "lazygit: 未能获取最新版本号"
     return 1
   fi
 
-  step "执行 Hermes Agent installer ..."
-  export HOME=/root
-  export HERMES_HOME
-  export PATH="/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
-  export npm_config_yes=true
-  if [ "$HERMES_SKIP_BROWSER" = true ]; then
-    install_args+=("--skip-browser")
+  tmpdir="$(mktemp -d /tmp/lazygit.XXXXXX)" || {
+    warn "lazygit: mktemp 失败"
+    summary_add failed "lazygit: mktemp 失败"
+    return 1
+  }
+  archive="$tmpdir/lazygit.tar.gz"
+  url="https://github.com/jesseduffield/lazygit/releases/download/v${version}/lazygit_${version}_Linux_${lazygit_arch}.tar.gz"
+
+  if ! download "$url" "$archive"; then
+    warn "lazygit: 下载失败 ($url)"
+    summary_add failed "lazygit: 下载失败"
+    rm -rf "$tmpdir"
+    return 1
   fi
-  if bash "$installer" "${install_args[@]}"; then
-    status=0
-  else
-    status=$?
+  if ! tar -xzf "$archive" -C "$tmpdir" lazygit; then
+    warn "lazygit: 解压失败"
+    summary_add failed "lazygit: 解压失败"
+    rm -rf "$tmpdir"
+    return 1
   fi
-  rm -f "$installer"
-  return "$status"
+  if ! install -m 0755 "$tmpdir/lazygit" /usr/local/bin/lazygit; then
+    warn "lazygit: 写入 /usr/local/bin/lazygit 失败"
+    summary_add failed "lazygit: 写入 /usr/local/bin/lazygit 失败"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  rm -rf "$tmpdir"
+  summary_add installed "lazygit: /usr/local/bin/lazygit"
+  ok "lazygit 已安装"
 }
 
-configure_api_server() {
-  local env_file api_key
-  mkdir -p "$HERMES_HOME"
-  env_file="$HERMES_HOME/.env"
-  touch "$env_file"
-  api_key="$(env_get "$env_file" API_SERVER_KEY)"
-  if [ -z "$api_key" ]; then
-    api_key="$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | cut -c1-32)"
+install_lazyssh() {
+  local arch lazyssh_arch tag url tmpdir archive
+  if skip_if_command_exists "lazyssh" lazyssh; then
+    return 0
   fi
-  env_set "$env_file" API_SERVER_ENABLED true
-  env_set "$env_file" API_SERVER_HOST "$HERMES_API_HOST"
-  env_set "$env_file" API_SERVER_PORT "$HERMES_API_PORT"
-  env_set "$env_file" API_SERVER_KEY "$api_key"
-  chmod 600 "$env_file"
+
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64 | amd64) lazyssh_arch="x86_64" ;;
+    aarch64 | arm64) lazyssh_arch="arm64" ;;
+    *)
+      warn "lazyssh: 不支持的架构 $arch"
+      summary_add failed "lazyssh: 不支持的架构 $arch"
+      return 1
+      ;;
+  esac
+
+  tag="$(curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-connrefused \
+    https://api.github.com/repos/Adembc/lazyssh/releases/latest |
+    sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' |
+    head -n 1)"
+  if [ -z "$tag" ]; then
+    warn "lazyssh: 未能获取最新版本号"
+    summary_add failed "lazyssh: 未能获取最新版本号"
+    return 1
+  fi
+
+  tmpdir="$(mktemp -d /tmp/lazyssh.XXXXXX)" || {
+    warn "lazyssh: mktemp 失败"
+    summary_add failed "lazyssh: mktemp 失败"
+    return 1
+  }
+  archive="$tmpdir/lazyssh.tar.gz"
+  url="https://github.com/Adembc/lazyssh/releases/download/${tag}/lazyssh_Linux_${lazyssh_arch}.tar.gz"
+
+  if ! download "$url" "$archive"; then
+    warn "lazyssh: 下载失败 ($url)"
+    summary_add failed "lazyssh: 下载失败"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  if ! tar -xzf "$archive" -C "$tmpdir" lazyssh; then
+    warn "lazyssh: 解压失败"
+    summary_add failed "lazyssh: 解压失败"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  if ! install -m 0755 "$tmpdir/lazyssh" /usr/local/bin/lazyssh; then
+    warn "lazyssh: 写入 /usr/local/bin/lazyssh 失败"
+    summary_add failed "lazyssh: 写入 /usr/local/bin/lazyssh 失败"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  rm -rf "$tmpdir"
+  summary_add installed "lazyssh: /usr/local/bin/lazyssh"
+  ok "lazyssh 已安装"
 }
 
-create_setup_helper() {
-  step "写入 /usr/bin/hermes-setup ..."
-  cat >/usr/bin/hermes-setup <<SETUP
-#!/usr/bin/env bash
-$HERMES_BIN setup
-chmod 700 /root/.hermes 2>/dev/null || true
-echo "Hermes setup complete."
-SETUP
-  chmod +x /usr/bin/hermes-setup
+install_blesh() {
+  if [ -s /root/.local/share/blesh/ble.sh ]; then
+    skip "ble.sh 已安装: /root/.local/share/blesh/ble.sh"
+    summary_add skipped "ble.sh: /root/.local/share/blesh/ble.sh (已安装，未改动)"
+    return 0
+  fi
+
+  mkdir -p /root/.local/src /root/.local/share
+  rm -rf /root/.local/src/ble.sh.new
+  if git clone --recursive --depth 1 --shallow-submodules https://github.com/akinomyoga/ble.sh.git /root/.local/src/ble.sh.new &&
+    make -C /root/.local/src/ble.sh.new install PREFIX=/root/.local &&
+    [ -s /root/.local/share/blesh/ble.sh ]; then
+    rm -rf /root/.local/src/ble.sh
+    mv /root/.local/src/ble.sh.new /root/.local/src/ble.sh
+    summary_add installed "ble.sh: /root/.local/share/blesh/ble.sh"
+    ok "ble.sh 已安装"
+    return 0
+  fi
+
+  rm -rf /root/.local/src/ble.sh.new
+  warn "ble.sh: 安装或检测失败"
+  summary_add failed "ble.sh: 安装或检测失败"
+  return 1
 }
 
-configure_login_hint() {
-  cat >/etc/profile.d/hermes-hint.sh <<'HINT'
-if [ "$(id -u)" -eq 0 ]; then
-  echo "  Run 'hermes-setup' to configure your model provider and gateway server."
+configure_shell_profile() {
+  write_root_file /etc/profile.d/hermes-shell.sh <<'SHELL_PROFILE'
+# 只增强 root 的交互 bash。非交互命令、脚本和其它用户不受影响。
+[ "$(id -u)" -eq 0 ] || return 0 2>/dev/null || exit 0
+[ -n "${BASH_VERSION:-}" ] || return 0 2>/dev/null || exit 0
+case "$-" in
+  *i*) ;;
+  *) return 0 2>/dev/null || exit 0 ;;
+esac
+
+export LANG=${LANG:-en_US.UTF-8}
+export PATH="/root/.local/bin:/usr/local/bin:$PATH"
+export EDITOR=vim
+export VISUAL="$EDITOR"
+export PAGER=less
+export LESS='-R -F -X -i -M'
+export BAT_PAGER=less
+
+[ -f /etc/bash_completion ] && . /etc/bash_completion
+
+if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
+  . /usr/share/doc/fzf/examples/key-bindings.bash
 fi
-HINT
+if [ -f /usr/share/doc/fzf/examples/completion.bash ]; then
+  . /usr/share/doc/fzf/examples/completion.bash
+fi
+
+if [ -s /root/.local/share/blesh/ble.sh ]; then
+  . /root/.local/share/blesh/ble.sh --attach=none
+fi
+
+alias l='ls -lah'
+alias ll='ls -alF'
+alias la='ls -A'
+alias path='printf "%s\n" ${PATH//:/ }'
+command -v batcat >/dev/null 2>&1 && alias bat='batcat'
+command -v fdfind >/dev/null 2>&1 && alias fd='fdfind'
+command -v rg >/dev/null 2>&1 && alias rgrep='rg'
+
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+
+if [ -n "${BLE_VERSION:-}" ]; then
+  ble-attach
+fi
+SHELL_PROFILE
+}
+
+configure_root_dotfiles() {
+  write_root_file /root/.inputrc <<'INPUTRC'
+set completion-ignore-case on
+set show-all-if-ambiguous on
+set show-all-if-unmodified on
+set mark-symlinked-directories on
+set colored-stats on
+set colored-completion-prefix on
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+INPUTRC
+
+  write_root_file /root/.vimrc <<'VIMRC'
+set nocompatible
+set encoding=utf-8
+set number
+set ignorecase
+set smartcase
+set incsearch
+set hlsearch
+set tabstop=4
+set shiftwidth=4
+set expandtab
+set autoindent
+syntax on
+filetype plugin indent on
+VIMRC
+
+  write_root_file /root/.tmux.conf <<'TMUX'
+set -g mouse on
+set -g history-limit 100000
+set -g default-terminal "tmux-256color"
+set -g escape-time 10
+setw -g mode-keys vi
+bind r source-file ~/.tmux.conf \; display-message 'tmux config reloaded'
+bind | split-window -h
+bind - split-window -v
+TMUX
+
+  write_root_file /root/.blerc <<'BLERC'
+bleopt complete_auto_complete=1
+bleopt complete_menu_complete=1
+bleopt complete_menu_style=desc
+bleopt complete_limit_auto=2000
+bleopt complete_menu_maxlines=10
+bleopt complete_ignore_case=1 2>/dev/null || true
+bleopt history_share=1
+ble-face auto_complete='fg=240,underline,italic'
+BLERC
+}
+
+configure_locale() {
+  if grep -q '^# *en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null; then
+    sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+    summary_add installed "/etc/locale.gen (启用 en_US.UTF-8 UTF-8)"
+  fi
+
+  if locale-gen en_US.UTF-8 >/dev/null 2>&1; then
+    summary_add installed "locale: en_US.UTF-8"
+  else
+    warn "locale-gen en_US.UTF-8 失败"
+    summary_add failed "locale-gen en_US.UTF-8 失败"
+  fi
+
+  if update-locale LANG=en_US.UTF-8 >/dev/null 2>&1; then
+    summary_add installed "/etc/default/locale (LANG=en_US.UTF-8)"
+  else
+    warn "update-locale LANG=en_US.UTF-8 失败"
+    summary_add failed "update-locale LANG=en_US.UTF-8 失败"
+  fi
 }
 
 printf '\033[1;37m\n'
 printf '  ╔════════════════════════════════════════════════════╗\n'
-printf '  ║  %-50s  ║\n' "Hermes 初始化"
-printf '  ║  %-50s  ║\n' "   依赖 · 官方安装器 · API Server"
+printf '  ║  %-50s  ║\n' "Hermes 外部环境"
+printf '  ║  %-50s  ║\n' "   维护工具 · GitHub CLI · uv · Shell"
 printf '  ╚════════════════════════════════════════════════════╝\n'
 printf '\033[0m'
-
-configure_interactively
-
-log "运行用户: \033[1mroot\033[0m (主目录: $TARGET_HOME)"
 
 log "APT 更新"
 step "apt-get update ..."
 apt-get update
 
-HERMES_REQUIRED_PACKAGES=(
-  ca-certificates curl git openssh-client
-  openssl sed mawk xz-utils
+MAINTENANCE_PACKAGES=(
+  ca-certificates curl wget gnupg
+  locales tzdata bash-completion man-db
+  build-essential pkg-config make gawk
+  git openssh-client
+  less tree vim nano tmux htop jq
+  unzip zip tar xz-utils zstd gzip file
+  iproute2 dnsutils
+  ripgrep fzf
+  shellcheck shfmt
+  bat fd-find btop
 )
 
-log "Hermes 必需依赖"
-step "安装 ${#HERMES_REQUIRED_PACKAGES[@]} 个必需包 ..."
-apt_install_required "${HERMES_REQUIRED_PACKAGES[@]}" || exit 1
-ok "Hermes 必需依赖安装完成"
+log "人工维护工具"
+step "安装 ${#MAINTENANCE_PACKAGES[@]} 个维护工具包 ..."
+apt_install_required "人工维护工具" "${MAINTENANCE_PACKAGES[@]}" || exit 1
+ok "人工维护工具安装完成"
 
-log "Hermes Home"
-mkdir -p "$HERMES_HOME"
-chmod 700 "$HERMES_HOME"
+log "Locale"
+configure_locale
+ok "locale 配置步骤完成"
 
-log "Hermes Agent"
-confirm_external_installer
-install_hermes_agent
-resolve_hermes_bin
-chmod 700 "$HERMES_HOME"
-git config --system --add safe.directory "$HERMES_AGENT_DIR" 2>/dev/null || true
-summary_add installed "Hermes Agent"
-if [ "$HERMES_SKIP_BROWSER" = true ]; then
-  summary_add skipped "Hermes 浏览器安装 (--skip-browser)"
-fi
-ok "Hermes Agent 安装完成"
+log "GitHub CLI"
+install_github_cli || true
 
-log "API Server"
-configure_api_server
-summary_add installed "API Server: $HERMES_API_HOST:$HERMES_API_PORT"
-ok "API Server 已配置: $HERMES_API_HOST:$HERMES_API_PORT"
+log "uv"
+install_uv || true
 
-log "Setup Helper"
-create_setup_helper
-configure_login_hint
-summary_add installed "hermes-setup"
-ok "运行 hermes-setup 配置模型 provider 和 gateway"
+log "Starship"
+install_starship || true
+
+log "Terminal TUI Tools"
+install_lazygit || true
+install_lazyssh || true
+install_blesh || true
+
+log "Shell Profile"
+configure_shell_profile
+ok "root 交互 shell 增强已配置"
+
+log "Root Dotfiles"
+configure_root_dotfiles
+ok "root 低侵入 dotfiles 已配置"
 
 log "清理 APT 缓存"
 apt-get autoremove -y >/dev/null 2>&1 || true
 apt-get autoclean -y >/dev/null 2>&1 || true
 ok "清理完成"
 
-printf '\n\033[1;32mHermes 初始化完成\033[0m\n\n'
-summary_print_list "已安装 / 已配置" "${SUMMARY_INSTALLED[@]}"
-summary_print_list "已跳过" "${SUMMARY_SKIPPED[@]}"
-summary_print_list "失败项" "${SUMMARY_FAILED[@]}"
-
-if [ "${#SUMMARY_FAILED[@]}" -gt 0 ]; then
-  exit 1
-fi
+printf '\n\033[1;32mHermes 外部环境初始化完成\033[0m\n\n'
+print_summary

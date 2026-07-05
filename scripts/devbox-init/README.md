@@ -161,7 +161,7 @@ INSTALL_NODE_TOOLS=0 INSTALL_GO_TOOLS=0 bash devbox-lang.sh --all
 
 `build-essential` `pkg-config` `make` `gawk` · `git` `openssh-client` `rsync` ·
 `curl` `wget` `gnupg` · `vim` `nano` `tmux` `htop` `jq` ·
-`unzip` `zip` `tar` `xz-utils` `zstd` `gzip` `bzip2` `file` `less` ·
+`unzip` `zip` `tar` `xz-utils` `zstd` `gzip` `bzip2` `file` `less` `tree` ·
 `iproute2` `iputils-ping` `dnsutils` `net-tools` · `locales` `tzdata` `bash-completion` `man-db` `fontconfig`
 
 ### 4.2 可选命令行包（缺失仅告警）
@@ -172,7 +172,7 @@ INSTALL_NODE_TOOLS=0 INSTALL_GO_TOOLS=0 bash devbox-lang.sh --all
 - **编译 / 调试**：`cmake` `ninja-build` `clang` `clangd` `clang-format` `lldb` `gdb` `valgrind`
 - **系统 / 网络诊断**：`strace` `ltrace` `lsof` `sysstat` `iotop` `iftop` `mtr-tiny` `traceroute` `tcpdump` `nmap` `netcat-openbsd` `socat` `whois`
 - **脚本 / 文本**：`shellcheck` `shfmt` `direnv` `entr` `httpie` `yq` `xmlstarlet` `jq`
-- **其它**：`neovim` `git-lfs` `tree` `7zip` `p7zip-full`
+- **其它**：`neovim` `git-lfs` `7zip` `p7zip-full`
 
 ### 4.3 语言工具链与版本管理器（独立脚本）
 

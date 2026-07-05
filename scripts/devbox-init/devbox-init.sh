@@ -300,7 +300,7 @@ CORE_PACKAGES=(
   fontconfig
   build-essential pkg-config make gawk
   git
-  unzip zip tar xz-utils zstd gzip file less
+  unzip zip tar xz-utils zstd gzip file less tree
   vim nano tmux htop jq
   iproute2 dnsutils
 )
@@ -314,7 +314,7 @@ else
 fi
 
 OPTIONAL_PACKAGES=(
-  tree neovim fzf ripgrep fd-find
+  neovim fzf ripgrep fd-find
   bat shellcheck shfmt direnv
   btop ncdu duf du-dust git-delta fastfetch
 )
