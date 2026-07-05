@@ -431,6 +431,8 @@ case "$-" in
   *i*) ;;
   *) return 0 2>/dev/null || exit 0 ;;
 esac
+[ -z "${HERMES_SHELL_PROFILE_LOADED:-}" ] || return 0 2>/dev/null || exit 0
+export HERMES_SHELL_PROFILE_LOADED=1
 
 export LANG=${LANG:-en_US.UTF-8}
 export PATH="/root/.local/bin:/usr/local/bin:$PATH"
@@ -469,6 +471,27 @@ if [ -n "${BLE_VERSION:-}" ]; then
   ble-attach
 fi
 SHELL_PROFILE
+
+  if [ ! -f /root/.bashrc ]; then
+    : >/root/.bashrc
+    chmod 0644 /root/.bashrc
+    summary_add installed "/root/.bashrc"
+  fi
+
+  if grep -q 'BEGIN hermes-init shell profile' /root/.bashrc 2>/dev/null; then
+    summary_add skipped "/root/.bashrc (hermes-init 加载块已存在，未改动)"
+    return 0
+  fi
+
+  cat >>/root/.bashrc <<'BASHRC'
+
+# BEGIN hermes-init shell profile
+if [ -r /etc/profile.d/hermes-shell.sh ]; then
+  . /etc/profile.d/hermes-shell.sh
+fi
+# END hermes-init shell profile
+BASHRC
+  summary_add installed "/root/.bashrc (追加 hermes-init 加载块)"
 }
 
 configure_root_dotfiles() {
