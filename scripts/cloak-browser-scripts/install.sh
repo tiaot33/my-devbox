@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+on_error() {
+  local status="$?"
+  printf '[cloakbrowser-install] ERROR: line %s failed with status %s: %s\n' "$1" "$status" "$2" >&2
+}
+
+trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+
 # Install CloakBrowser on a clean Ubuntu/Debian LXC host.
 # This is a single-file installer; it does not need a local CloakBrowser source tree.
 # Run from any directory:
