@@ -124,7 +124,11 @@ prompt_optional_value() {
     return
   fi
 
-  read -r -p "${label} (Enter=skip/empty) [${default_value:-empty}]: " value
+  if [ -n "$default_value" ]; then
+    read -r -p "${label} (Enter=use default) [${default_value}]: " value
+  else
+    read -r -p "${label} (Enter=skip) [<empty>]: " value
+  fi
   if [ -z "$value" ]; then
     value="$default_value"
   fi
