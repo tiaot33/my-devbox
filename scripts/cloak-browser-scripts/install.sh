@@ -57,7 +57,7 @@ CDP_BIND="${CDP_BIND:-127.0.0.1}"
 ENABLE_CLOAKSERVE="${ENABLE_CLOAKSERVE:-0}"
 CLOAKSERVE_HEADLESS="${CLOAKSERVE_HEADLESS:-false}"
 CLOAKSERVE_DATA_DIR="${CLOAKSERVE_DATA_DIR:-}"
-CLOAKSERVE_IDLE_TIMEOUT="${CLOAKSERVE_IDLE_TIMEOUT:-}"
+CLOAKSERVE_IDLE_TIMEOUT="${CLOAKSERVE_IDLE_TIMEOUT:-0}"
 CLOAKSERVE_FINGERPRINT="${CLOAKSERVE_FINGERPRINT:-}"
 CLOAKSERVE_LOCALE="${CLOAKSERVE_LOCALE:-}"
 CLOAKSERVE_TIMEZONE="${CLOAKSERVE_TIMEZONE:-}"
@@ -317,7 +317,7 @@ prompt_config() {
     fi
 
     if prompt_confirm "Configure advanced cloakserve defaults" 0; then
-      prompt_optional_value CLOAKSERVE_IDLE_TIMEOUT "Stop idle cloakserve browsers after seconds" "$CLOAKSERVE_IDLE_TIMEOUT"
+      prompt_optional_value CLOAKSERVE_IDLE_TIMEOUT "Idle timeout in seconds (0=never stop)" "$CLOAKSERVE_IDLE_TIMEOUT"
       prompt_optional_value CLOAKSERVE_FINGERPRINT "default fingerprint seed" "$CLOAKSERVE_FINGERPRINT"
       prompt_optional_value CLOAKSERVE_LOCALE "default locale" "$CLOAKSERVE_LOCALE"
       prompt_optional_value CLOAKSERVE_TIMEZONE "default timezone" "$CLOAKSERVE_TIMEZONE"
