@@ -101,7 +101,7 @@ prompt_value() {
     return
   fi
 
-  read -r -p "${label} [${default_value}]: " value
+  read -r -p "${label} (Enter=default) [${default_value}]: " value
   if [ -z "$value" ]; then
     value="$default_value"
   fi
@@ -124,11 +124,47 @@ prompt_optional_value() {
     return
   fi
 
-  read -r -p "${label} [${default_value:-empty}]: " value
+  read -r -p "${label} (Enter=skip/empty) [${default_value:-empty}]: " value
   if [ -z "$value" ]; then
     value="$default_value"
   fi
   printf -v "$var_name" '%s' "$value"
+}
+
+prompt_choice() {
+  local var_name="$1"
+  local label="$2"
+  local default_value="$3"
+  shift 3
+  local user_set_var="USER_SET_${var_name}"
+
+  if [ "${!user_set_var:-}" = "x" ]; then
+    return
+  fi
+
+  if ! is_interactive; then
+    printf -v "$var_name" '%s' "$default_value"
+    return
+  fi
+
+  printf '\n%s:\n' "$label"
+  local i=1 default_num=1 opts_val=()
+  while [ $# -ge 2 ]; do
+    opts_val+=("$1")
+    printf '  %d) %s\n' "$i" "$2"
+    [ "$1" = "$default_value" ] && default_num="$i"
+    i=$((i + 1))
+    shift 2
+  done
+
+  local choice
+  read -r -p "Choose [${default_num}]: " choice
+  choice="${choice:-$default_num}"
+  if [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -lt "$i" ]; then
+    printf -v "$var_name" '%s' "${opts_val[$((choice - 1))]}"
+  else
+    printf -v "$var_name" '%s' "$default_value"
+  fi
 }
 
 prompt_yes_no() {
@@ -136,11 +172,11 @@ prompt_yes_no() {
   local label="$2"
   local default_value="$3"
   local value
-  local default_label="n"
+  local default_num="2"
   local user_set_var="USER_SET_${var_name}"
 
   if [ "$default_value" = "1" ]; then
-    default_label="y"
+    default_num="1"
   fi
 
   if [ "${!user_set_var:-}" = "x" ]; then
@@ -152,9 +188,12 @@ prompt_yes_no() {
     return
   fi
 
-  read -r -p "${label} [${default_label}]: " value
-  case "${value:-$default_label}" in
-    y|Y|yes|YES|1|true|TRUE) printf -v "$var_name" '1' ;;
+  printf '\n%s:\n' "$label"
+  printf '  1) Yes\n'
+  printf '  2) No\n'
+  read -r -p "Choose [${default_num}]: " value
+  case "${value:-$default_num}" in
+    1|y|Y|yes|YES) printf -v "$var_name" '1' ;;
     *) printf -v "$var_name" '0' ;;
   esac
 }
@@ -162,12 +201,12 @@ prompt_yes_no() {
 prompt_confirm() {
   local label="$1"
   local default_value="$2"
-  local value default_label
+  local value default_num
 
   if [ "$default_value" = "1" ]; then
-    default_label="y"
+    default_num="1"
   else
-    default_label="n"
+    default_num="2"
   fi
 
   if ! is_interactive; then
@@ -175,9 +214,12 @@ prompt_confirm() {
     return
   fi
 
-  read -r -p "${label} [${default_label}]: " value
-  case "${value:-$default_label}" in
-    y|Y|yes|YES|1|true|TRUE) return 0 ;;
+  printf '\n%s:\n' "$label"
+  printf '  1) Yes\n'
+  printf '  2) No\n'
+  read -r -p "Choose [${default_num}]: " value
+  case "${value:-$default_num}" in
+    1|y|Y|yes|YES) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -260,7 +302,9 @@ prompt_config() {
   prompt_vnc_password
 
   if [ "$ENABLE_CLOAKSERVE" = "1" ]; then
-    prompt_value CDP_BIND "CDP listen address (127.0.0.1 or 0.0.0.0)" "$CDP_BIND"
+    prompt_choice CDP_BIND "CDP listen address" "$CDP_BIND" \
+      "127.0.0.1" "127.0.0.1 (local only, safer)" \
+      "0.0.0.0" "0.0.0.0 (all interfaces, public)"
     prompt_value CDP_PORT "CDP public port" "$CDP_PORT"
     prompt_cloakserve_headless
 
