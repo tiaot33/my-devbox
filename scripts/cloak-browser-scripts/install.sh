@@ -34,10 +34,6 @@ USER_SET_CLOAKSERVE_IDLE_TIMEOUT="${CLOAKSERVE_IDLE_TIMEOUT+x}"
 # shellcheck disable=SC2034
 USER_SET_CLOAKSERVE_FINGERPRINT="${CLOAKSERVE_FINGERPRINT+x}"
 # shellcheck disable=SC2034
-USER_SET_CLOAKSERVE_LOCALE="${CLOAKSERVE_LOCALE+x}"
-# shellcheck disable=SC2034
-USER_SET_CLOAKSERVE_TIMEZONE="${CLOAKSERVE_TIMEZONE+x}"
-# shellcheck disable=SC2034
 USER_SET_CLOAKSERVE_PROXY_SERVER="${CLOAKSERVE_PROXY_SERVER+x}"
 # shellcheck disable=SC2034
 USER_SET_CLOAKSERVE_EXTRA_ARGS="${CLOAKSERVE_EXTRA_ARGS+x}"
@@ -59,8 +55,6 @@ CLOAKSERVE_HEADLESS="${CLOAKSERVE_HEADLESS:-false}"
 CLOAKSERVE_DATA_DIR="${CLOAKSERVE_DATA_DIR:-}"
 CLOAKSERVE_IDLE_TIMEOUT="${CLOAKSERVE_IDLE_TIMEOUT:-0}"
 CLOAKSERVE_FINGERPRINT="${CLOAKSERVE_FINGERPRINT:-}"
-CLOAKSERVE_LOCALE="${CLOAKSERVE_LOCALE:-}"
-CLOAKSERVE_TIMEZONE="${CLOAKSERVE_TIMEZONE:-}"
 CLOAKSERVE_PROXY_SERVER="${CLOAKSERVE_PROXY_SERVER:-}"
 CLOAKSERVE_EXTRA_ARGS="${CLOAKSERVE_EXTRA_ARGS:-}"
 INSTALL_JS="${INSTALL_JS:-1}"
@@ -319,10 +313,8 @@ prompt_config() {
     if prompt_confirm "Configure advanced cloakserve defaults" 0; then
       prompt_optional_value CLOAKSERVE_IDLE_TIMEOUT "Idle timeout in seconds (0=never stop)" "$CLOAKSERVE_IDLE_TIMEOUT"
       prompt_optional_value CLOAKSERVE_FINGERPRINT "Default fingerprint seed (A-Z, a-z, 0-9, _, - only)" "$CLOAKSERVE_FINGERPRINT"
-      prompt_optional_value CLOAKSERVE_LOCALE "Default locale (e.g., en-US, zh-CN, ja-JP)" "$CLOAKSERVE_LOCALE"
-      prompt_optional_value CLOAKSERVE_TIMEZONE "Default timezone (e.g., America/New_York, Asia/Shanghai, UTC)" "$CLOAKSERVE_TIMEZONE"
-      prompt_optional_value CLOAKSERVE_PROXY_SERVER "default proxy server with GeoIP" "$CLOAKSERVE_PROXY_SERVER"
-      prompt_optional_value CLOAKSERVE_EXTRA_ARGS "extra cloakserve/browser args" "$CLOAKSERVE_EXTRA_ARGS"
+      prompt_optional_value CLOAKSERVE_PROXY_SERVER "Default proxy server; GeoIP derives locale/timezone/geolocation from it" "$CLOAKSERVE_PROXY_SERVER"
+      prompt_optional_value CLOAKSERVE_EXTRA_ARGS "Extra cloakserve/browser args" "$CLOAKSERVE_EXTRA_ARGS"
     fi
   fi
 }
@@ -357,8 +349,6 @@ validate_config() {
   validate_no_whitespace CLOAKSERVE_DATA_DIR "$CLOAKSERVE_DATA_DIR"
   validate_no_whitespace CLOAKSERVE_IDLE_TIMEOUT "$CLOAKSERVE_IDLE_TIMEOUT"
   validate_no_whitespace CLOAKSERVE_FINGERPRINT "$CLOAKSERVE_FINGERPRINT"
-  validate_no_whitespace CLOAKSERVE_LOCALE "$CLOAKSERVE_LOCALE"
-  validate_no_whitespace CLOAKSERVE_TIMEZONE "$CLOAKSERVE_TIMEZONE"
   validate_no_whitespace CLOAKSERVE_PROXY_SERVER "$CLOAKSERVE_PROXY_SERVER"
   case "$CLOAKSERVE_HEADLESS" in
     true|false) ;;
@@ -509,8 +499,6 @@ args=(--headless="\${CLOAKSERVE_HEADLESS}" --host="\${CDP_BIND}" --port="\${CDP_
 [ -n "\${CLOAKSERVE_DATA_DIR}" ] && args+=(--data-dir="\${CLOAKSERVE_DATA_DIR}")
 [ -n "\${CLOAKSERVE_IDLE_TIMEOUT}" ] && args+=(--idle-timeout="\${CLOAKSERVE_IDLE_TIMEOUT}")
 [ -n "\${CLOAKSERVE_FINGERPRINT}" ] && args+=(--fingerprint="\${CLOAKSERVE_FINGERPRINT}")
-[ -n "\${CLOAKSERVE_LOCALE}" ] && args+=(--fingerprint-locale="\${CLOAKSERVE_LOCALE}")
-[ -n "\${CLOAKSERVE_TIMEZONE}" ] && args+=(--fingerprint-timezone="\${CLOAKSERVE_TIMEZONE}")
 [ -n "\${CLOAKSERVE_PROXY_SERVER}" ] && args+=(--default-proxy="\${CLOAKSERVE_PROXY_SERVER}")
 if [ -n "\${CLOAKSERVE_EXTRA_ARGS}" ]; then
   # Intentional shell splitting for advanced Chromium flags supplied by the admin.
@@ -611,8 +599,6 @@ EOF
     write_bash_var CLOAKSERVE_DATA_DIR "$CLOAKSERVE_DATA_DIR"
     write_bash_var CLOAKSERVE_IDLE_TIMEOUT "$CLOAKSERVE_IDLE_TIMEOUT"
     write_bash_var CLOAKSERVE_FINGERPRINT "$CLOAKSERVE_FINGERPRINT"
-    write_bash_var CLOAKSERVE_LOCALE "$CLOAKSERVE_LOCALE"
-    write_bash_var CLOAKSERVE_TIMEZONE "$CLOAKSERVE_TIMEZONE"
     write_bash_var CLOAKSERVE_PROXY_SERVER "$CLOAKSERVE_PROXY_SERVER"
     write_bash_var CLOAKSERVE_EXTRA_ARGS "$CLOAKSERVE_EXTRA_ARGS"
   } >/etc/cloakbrowser/cloakserve.conf

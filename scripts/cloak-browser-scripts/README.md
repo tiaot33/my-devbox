@@ -105,13 +105,11 @@ Configure advanced cloakserve defaults
 ```text
 Stop idle cloakserve browsers after seconds
 default fingerprint seed
-default locale
-default timezone
-default proxy server with GeoIP
+default proxy server; GeoIP derives locale/timezone/geolocation from it
 extra cloakserve/browser args
 ```
 
-脚本使用仓库内维护的 `cloakserve`，支持默认 fingerprint、locale、timezone、proxy + GeoIP。配置 `CLOAKSERVE_PROXY_SERVER` 后，服务端会把它作为每个新浏览器进程的默认 proxy，并自动按这个 proxy 做 GeoIP 推导；客户端仍然连接普通 CDP URL，不需要手写 query 参数。
+脚本使用仓库内维护的 `cloakserve`，支持默认 fingerprint、proxy + GeoIP。配置 `CLOAKSERVE_PROXY_SERVER` 后，服务端会把它作为每个新浏览器进程的默认 proxy，并自动按这个 proxy 做 GeoIP 推导；客户端仍然连接普通 CDP URL，不需要手写 query 参数。locale、timezone、geolocation 应由同一次 GeoIP 结果推导，不再作为安装器交互项单独设置。
 
 ## VNC 密码
 
@@ -222,8 +220,7 @@ sudo -E bash scripts/cloak-browser-scripts/install.sh
 - `CLOAKSERVE_DATA_DIR`：每个 fingerprint seed 的 profile 存放目录
 - `CLOAKSERVE_IDLE_TIMEOUT`：CDP 断开后多少秒清理对应 Chrome 进程和 profile
 - `CLOAKSERVE_FINGERPRINT`：未在连接 URL 里传 `fingerprint` 时使用的默认 seed
-- `CLOAKSERVE_LOCALE`：未在连接 URL 里传 `locale` 时使用的默认 locale，例如 `en-US`
-- `CLOAKSERVE_TIMEZONE`：未在连接 URL 里传 `timezone` 时使用的默认 timezone，例如 `America/New_York`
+- `CLOAKSERVE_PROXY_SERVER`：未在连接 URL 里传 `proxy` 时使用的默认代理；配置后默认启用 GeoIP 推导
 
 `CLOAKSERVE_DATA_DIR` 留空则安装器不写 `--data-dir`，使用 `cloakserve` 自身默认行为。
 
