@@ -318,9 +318,9 @@ prompt_config() {
 
     if prompt_confirm "Configure advanced cloakserve defaults" 0; then
       prompt_optional_value CLOAKSERVE_IDLE_TIMEOUT "Idle timeout in seconds (0=never stop)" "$CLOAKSERVE_IDLE_TIMEOUT"
-      prompt_optional_value CLOAKSERVE_FINGERPRINT "default fingerprint seed" "$CLOAKSERVE_FINGERPRINT"
-      prompt_optional_value CLOAKSERVE_LOCALE "default locale" "$CLOAKSERVE_LOCALE"
-      prompt_optional_value CLOAKSERVE_TIMEZONE "default timezone" "$CLOAKSERVE_TIMEZONE"
+      prompt_optional_value CLOAKSERVE_FINGERPRINT "Default fingerprint seed (A-Z, a-z, 0-9, _, - only)" "$CLOAKSERVE_FINGERPRINT"
+      prompt_optional_value CLOAKSERVE_LOCALE "Default locale (e.g., en-US, zh-CN, ja-JP)" "$CLOAKSERVE_LOCALE"
+      prompt_optional_value CLOAKSERVE_TIMEZONE "Default timezone (e.g., America/New_York, Asia/Shanghai, UTC)" "$CLOAKSERVE_TIMEZONE"
       prompt_optional_value CLOAKSERVE_PROXY_SERVER "default proxy server with GeoIP" "$CLOAKSERVE_PROXY_SERVER"
       prompt_optional_value CLOAKSERVE_EXTRA_ARGS "extra cloakserve/browser args" "$CLOAKSERVE_EXTRA_ARGS"
     fi
