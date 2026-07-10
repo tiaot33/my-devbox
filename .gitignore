@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local Firecrawl research cache
+.firecrawl/
+.claude/
+.agents/
+.codex/
