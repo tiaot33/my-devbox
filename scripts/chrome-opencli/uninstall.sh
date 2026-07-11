@@ -8,6 +8,7 @@ APP_USER="chrome-opencli"
 APP_GROUP="chrome-opencli"
 APP_HOME="/var/lib/chrome-opencli"
 CONFIG_DIR="/etc/chrome-opencli"
+ACCOUNT_MARKER="${CONFIG_DIR}/managed-account"
 POLICY_FILE="/etc/opt/chrome/policies/managed/chrome-opencli.json"
 
 PURGE_DATA=0
@@ -62,12 +63,6 @@ daemon_is_listening() {
 stop_services() {
   log "正在停止并禁用服务"
   systemctl disable --now chrome-opencli.target >/dev/null 2>&1 || true
-  systemctl stop \
-    chrome-opencli-browser.service \
-    chrome-opencli-vnc.service \
-    chrome-opencli-openbox.service \
-    chrome-opencli-xvfb.service \
-    chrome-opencli-daemon.service >/dev/null 2>&1 || true
 
   if ! id "$APP_USER" >/dev/null 2>&1; then
     return
@@ -98,47 +93,30 @@ remove_units_and_policy() {
   log "正在删除 systemd 单元和 OpenCLI Chrome 策略"
   rm -f \
     /etc/systemd/system/chrome-opencli.target \
-    /etc/systemd/system/chrome-opencli-daemon.service \
     /etc/systemd/system/chrome-opencli-xvfb.service \
     /etc/systemd/system/chrome-opencli-openbox.service \
     /etc/systemd/system/chrome-opencli-browser.service \
     /etc/systemd/system/chrome-opencli-vnc.service \
-    /usr/local/libexec/chrome-opencli-prepare-display \
-    /usr/local/libexec/chrome-opencli-wait-display \
     "$POLICY_FILE"
   systemctl daemon-reload
-  systemctl reset-failed >/dev/null 2>&1 || true
 }
 
 purge_data() {
   [ "$PURGE_DATA" = "1" ] || return
 
   log "正在删除持久 Chrome profile 和 chrome-opencli 配置"
-  local user_origin="existing"
-  local group_origin="existing"
-  local expected_uid=""
-  local expected_gid=""
-  if [ -r "${CONFIG_DIR}/user-origin" ]; then
-    user_origin="$(tr -d '\r\n' < "${CONFIG_DIR}/user-origin")"
-  fi
-  if [ -r "${CONFIG_DIR}/group-origin" ]; then
-    group_origin="$(tr -d '\r\n' < "${CONFIG_DIR}/group-origin")"
-  fi
-  if [ -r "${CONFIG_DIR}/user-id" ]; then
-    expected_uid="$(tr -d '\r\n' < "${CONFIG_DIR}/user-id")"
-  fi
-  if [ -r "${CONFIG_DIR}/group-id" ]; then
-    expected_gid="$(tr -d '\r\n' < "${CONFIG_DIR}/group-id")"
-  fi
+  [ -r "$ACCOUNT_MARKER" ] || \
+    die "缺少安装账号标记，拒绝删除数据"
+  local account_id expected_gid
+  account_id="$(tr -d '\r\n' < "$ACCOUNT_MARKER")"
+  expected_gid="${account_id#*:}"
 
-  if [ "$user_origin" = "created" ] && id "$APP_USER" >/dev/null 2>&1; then
-    [ -n "$expected_uid" ] || die "缺少 ${APP_USER} 的 UID 记录，拒绝删除账号"
-    [ "$(id -u "$APP_USER")" = "$expected_uid" ] || \
-      die "${APP_USER} 当前 UID 与安装记录不一致"
+  if id "$APP_USER" >/dev/null 2>&1; then
+    [ "$(id -u "$APP_USER"):$(id -g "$APP_USER")" = "$account_id" ] || \
+      die "${APP_USER} 当前 UID/GID 与安装记录不一致"
     userdel "$APP_USER"
   fi
-  if [ "$group_origin" = "created" ] && getent group "$APP_GROUP" >/dev/null; then
-    [ -n "$expected_gid" ] || die "缺少 ${APP_GROUP} 的 GID 记录，拒绝删除组"
+  if getent group "$APP_GROUP" >/dev/null; then
     [ "$(getent group "$APP_GROUP" | cut -d: -f3)" = "$expected_gid" ] || \
       die "${APP_GROUP} 当前 GID 与安装记录不一致"
     groupdel "$APP_GROUP"

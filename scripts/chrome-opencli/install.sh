@@ -12,6 +12,7 @@ OPENCLI_CONFIG_DIR="${APP_HOME}/.opencli"
 CONFIG_DIR="/etc/chrome-opencli"
 ENV_FILE="${CONFIG_DIR}/environment"
 XAUTHORITY_FILE="${CONFIG_DIR}/Xauthority"
+ACCOUNT_MARKER="${CONFIG_DIR}/managed-account"
 POLICY_FILE="/etc/opt/chrome/policies/managed/chrome-opencli.json"
 
 OPENCLI_EXTENSION_ID="ildkmabpimmkaediidaifkhjpohdnifk"
@@ -25,25 +26,21 @@ USER_SET_VNC_BIND="${VNC_BIND+x}"
 USER_SET_VNC_PORT="${VNC_PORT+x}"
 VNC_PASSWORD_WAS_SET="${VNC_PASSWORD+x}"
 
-DISPLAY_NUM="${DISPLAY_NUM:-99}"
+DISPLAY_NUM=99
 DISPLAY_VALUE=":${DISPLAY_NUM}"
 SCREEN_GEOMETRY="${SCREEN_GEOMETRY:-1920x1080}"
 VNC_BIND="${VNC_BIND:-127.0.0.1}"
 VNC_PORT="${VNC_PORT:-5900}"
 VNC_PASSWORD="${VNC_PASSWORD:-}"
-OPENCLI_VERSION="${OPENCLI_VERSION:-latest}"
-NODE_MAJOR="${NODE_MAJOR:-22}"
-CHROME_NO_SANDBOX="${CHROME_NO_SANDBOX:-0}"
-VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-120}"
 ASSUME_YES="${ASSUME_YES:-0}"
+
+NODE_MAJOR=22
+VERIFY_TIMEOUT=120
 
 TMP_DIR=""
 VNC_AUTH_ARGS=""
 VNC_PASSWORD_RESULT=""
-STACK_WAS_ACTIVE=0
-STACK_STARTED=0
-INSTALL_SUCCEEDED=0
-CAN_RESTORE_OLD_STACK=1
+STACK_TOUCHED=0
 
 log() {
   printf '[chrome-opencli] %s\n' "$*"
@@ -63,20 +60,10 @@ cleanup() {
   local status="$?"
   trap - EXIT
 
-  if [ "$status" -ne 0 ] && [ "$INSTALL_SUCCEEDED" != "1" ]; then
-    if [ "$STACK_STARTED" = "1" ]; then
-      systemctl disable --now chrome-opencli.target >/dev/null 2>&1 || true
-      if id "$APP_USER" >/dev/null 2>&1 && command -v opencli >/dev/null 2>&1; then
-        run_as_app_user opencli daemon stop >/dev/null 2>&1 || true
-        local attempt
-        for ((attempt = 0; attempt < 15; attempt++)); do
-          daemon_is_listening || break
-          sleep 0.2
-        done
-      fi
-    elif [ "$STACK_WAS_ACTIVE" = "1" ] && [ "$CAN_RESTORE_OLD_STACK" = "1" ]; then
-      systemctl daemon-reload >/dev/null 2>&1 || true
-      systemctl start chrome-opencli.target >/dev/null 2>&1 || true
+  if [ "$status" -ne 0 ] && [ "$STACK_TOUCHED" = "1" ]; then
+    systemctl disable --now chrome-opencli.target >/dev/null 2>&1 || true
+    if id "$APP_USER" >/dev/null 2>&1 && command -v opencli >/dev/null 2>&1; then
+      run_as_app_user opencli daemon stop >/dev/null 2>&1 || true
     fi
   fi
   if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
@@ -100,8 +87,6 @@ usage() {
   VNC_BIND           默认 127.0.0.1
   VNC_PORT           默认 5900
   VNC_PASSWORD       未设置时保留旧密码或首次随机生成；显式空值表示无密码
-  OPENCLI_VERSION    默认 latest，最低支持 1.7.0
-  CHROME_NO_SANDBOX  默认 0；设为 1 会降低安全性
 EOF
 }
 
@@ -300,12 +285,6 @@ confirm_configuration() {
   printf '  VNC 监听地址: %s\n' "$VNC_BIND"
   printf '  VNC 端口: %s\n' "$VNC_PORT"
   printf '  VNC 密码: %s\n' "$password_mode"
-  printf '  OpenCLI 版本: %s\n' "$OPENCLI_VERSION"
-  if [ "$CHROME_NO_SANDBOX" = "1" ]; then
-    printf '  Chrome sandbox: 已禁用（高风险）\n'
-  else
-    printf '  Chrome sandbox: 已启用\n'
-  fi
   if ! is_loopback_bind; then
     printf '  注意: VNC 将对网络开放，请使用防火墙或 VPN 限制来源。\n'
   fi
@@ -342,9 +321,7 @@ collect_configuration() {
 
 validate_config() {
   local screen_width screen_height
-  validate_integer_range DISPLAY_NUM "$DISPLAY_NUM" 1 255
   validate_integer_range VNC_PORT "$VNC_PORT" 1 65535
-  validate_integer_range VERIFY_TIMEOUT "$VERIFY_TIMEOUT" 30 900
 
   [[ "$SCREEN_GEOMETRY" =~ ^[0-9]+x[0-9]+$ ]] || die "SCREEN_GEOMETRY must look like 1920x1080"
   screen_width="${SCREEN_GEOMETRY%x*}"
@@ -355,27 +332,6 @@ validate_config() {
   if [[ ! "$VNC_BIND" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
     die "VNC_BIND must be an IPv4 address or hostname and cannot start with '-'"
   fi
-
-  case "$NODE_MAJOR" in
-    20|22|24) ;;
-    *) die "NODE_MAJOR must be one of: 20, 22, 24" ;;
-  esac
-
-  if [[ ! "$OPENCLI_VERSION" =~ ^(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-    die "OPENCLI_VERSION must be 'latest' or a stable semantic version such as 1.8.6"
-  fi
-  if [ "$OPENCLI_VERSION" != "latest" ]; then
-    local opencli_major opencli_minor
-    IFS=. read -r opencli_major opencli_minor _ <<<"$OPENCLI_VERSION"
-    if [ "$opencli_major" -lt 1 ] || { [ "$opencli_major" -eq 1 ] && [ "$opencli_minor" -lt 7 ]; }; then
-      die "OPENCLI_VERSION must be 1.7.0 or newer for the Browser Bridge used by this installer"
-    fi
-  fi
-
-  case "$CHROME_NO_SANDBOX" in
-    0|1) ;;
-    *) die "CHROME_NO_SANDBOX must be 0 or 1" ;;
-  esac
 
   if [ "$VNC_PASSWORD_WAS_SET" = "x" ] && [ -n "$VNC_PASSWORD" ]; then
     validate_vnc_password "$VNC_PASSWORD"
@@ -409,18 +365,14 @@ download() {
   [ -s "$output" ] || die "downloaded file is empty: ${url}"
 }
 
+render_file() {
+  install -m 0600 /dev/stdin "${TMP_DIR}/$1"
+}
+
 stop_existing_services() {
   log "Stopping an existing chrome-opencli stack, if present"
-  if systemctl is-active --quiet chrome-opencli.target; then
-    STACK_WAS_ACTIVE=1
-  fi
+  STACK_TOUCHED=1
   systemctl stop chrome-opencli.target >/dev/null 2>&1 || true
-  systemctl stop \
-    chrome-opencli-browser.service \
-    chrome-opencli-vnc.service \
-    chrome-opencli-openbox.service \
-    chrome-opencli-xvfb.service \
-    chrome-opencli-daemon.service >/dev/null 2>&1 || true
 
   if id "$APP_USER" >/dev/null 2>&1 && command -v opencli >/dev/null 2>&1; then
     run_as_app_user opencli daemon stop >/dev/null 2>&1 || true
@@ -527,108 +479,59 @@ EOF
 }
 
 install_opencli() {
-  log "Installing @jackwener/opencli@${OPENCLI_VERSION} globally"
+  log "Installing the latest @jackwener/opencli globally"
   NPM_CONFIG_USERCONFIG=/dev/null npm install \
     --global \
     --prefix /usr/local \
     --ignore-scripts \
     --registry=https://registry.npmjs.org/ \
-    "@jackwener/opencli@${OPENCLI_VERSION}"
+    @jackwener/opencli@latest
   [ -x /usr/local/bin/opencli ] || die "opencli command was not installed at /usr/local/bin/opencli"
   run_as_app_user /usr/local/bin/opencli --version >/dev/null
 }
 
 create_app_user() {
-  local group_origin="existing"
-  local user_origin="existing"
-  local group_gid sys_gid_max unexpected_supplementary unexpected_primary
-  local account_uid duplicate_uid_users member_gid
-  local -a account_gids
+  local account_id passwd_record existing_home existing_group existing_shell
 
-  if ! getent group "$APP_GROUP" >/dev/null; then
-    groupadd --system "$APP_GROUP"
-    group_origin="created"
-  fi
-  group_gid="$(getent group "$APP_GROUP" | cut -d: -f3)"
+  if id "$APP_USER" >/dev/null 2>&1; then
+    [ -r "$ACCOUNT_MARKER" ] || \
+      die "existing user ${APP_USER} is not managed by this installer"
+    account_id="$(id -u "$APP_USER"):$(id -g "$APP_USER")"
+    [ "$(tr -d '\r\n' < "$ACCOUNT_MARKER")" = "$account_id" ] || \
+      die "existing user ${APP_USER} no longer matches the installer record"
 
-  if ! id "$APP_USER" >/dev/null 2>&1; then
-    useradd \
-      --system \
-      --gid "$APP_GROUP" \
-      --home-dir "$APP_HOME" \
-      --shell /usr/sbin/nologin \
-      "$APP_USER"
-    user_origin="created"
-  else
-    local existing_home existing_group existing_shell existing_uid sys_uid_max
-    existing_home="$(getent passwd "$APP_USER" | cut -d: -f6)"
+    passwd_record="$(getent passwd "$APP_USER")"
+    IFS=: read -r _ _ _ _ _ existing_home existing_shell <<<"$passwd_record"
     existing_group="$(id -gn "$APP_USER")"
-    existing_shell="$(getent passwd "$APP_USER" | cut -d: -f7)"
-    existing_uid="$(id -u "$APP_USER")"
-    sys_uid_max="$(awk '$1 == "SYS_UID_MAX" { print $2; exit }' /etc/login.defs 2>/dev/null || true)"
-    sys_uid_max="${sys_uid_max:-999}"
-    [ "$existing_home" = "$APP_HOME" ] || \
-      die "existing user ${APP_USER} has home ${existing_home}, expected ${APP_HOME}"
-    [ "$existing_group" = "$APP_GROUP" ] || \
-      die "existing user ${APP_USER} has primary group ${existing_group}, expected ${APP_GROUP}"
-    [ "$existing_shell" = "/usr/sbin/nologin" ] || \
-      die "existing user ${APP_USER} must use /usr/sbin/nologin"
-    [ "$existing_uid" -le "$sys_uid_max" ] || \
-      die "existing user ${APP_USER} is not a system account"
+    [ "$existing_home" = "$APP_HOME" ] && \
+      [ "$existing_group" = "$APP_GROUP" ] && \
+      [ "$existing_shell" = "/usr/sbin/nologin" ] || \
+      die "existing user ${APP_USER} has unexpected account settings"
+    return
   fi
 
-  sys_gid_max="$(awk '$1 == "SYS_GID_MAX" { print $2; exit }' /etc/login.defs 2>/dev/null || true)"
-  sys_gid_max="${sys_gid_max:-999}"
-  [ "$group_gid" -le "$sys_gid_max" ] || \
-    die "existing group ${APP_GROUP} is not a system group"
-  account_uid="$(id -u "$APP_USER")"
-  read -r -a account_gids <<<"$(id -G "$APP_USER")"
-  for member_gid in "${account_gids[@]}"; do
-    [ "$member_gid" = "$group_gid" ] || \
-      die "existing user ${APP_USER} belongs to unexpected supplementary GID ${member_gid}"
-  done
-  duplicate_uid_users="$(getent passwd | awk -F: -v uid="$account_uid" -v app="$APP_USER" '
-    $3 == uid && $1 != app { print $1 }
-  ')"
-  [ -z "$duplicate_uid_users" ] || \
-    die "UID ${account_uid} is also used by: ${duplicate_uid_users//$'\n'/,}"
-  unexpected_supplementary="$(getent group "$APP_GROUP" | awk -F: -v app="$APP_USER" '
-    { count = split($4, members, ",") }
-    { for (i = 1; i <= count; i++) if (members[i] != "" && members[i] != app) print members[i] }
-  ')"
-  unexpected_primary="$(getent passwd | awk -F: -v gid="$group_gid" -v app="$APP_USER" '
-    $4 == gid && $1 != app { print $1 }
-  ')"
-  [ -z "$unexpected_supplementary" ] || \
-    die "group ${APP_GROUP} has unexpected supplementary members: ${unexpected_supplementary//$'\n'/,}"
-  [ -z "$unexpected_primary" ] || \
-    die "group ${APP_GROUP} is the primary group of another user: ${unexpected_primary//$'\n'/,}"
+  getent group "$APP_GROUP" >/dev/null && \
+    die "existing group ${APP_GROUP} is not managed by this installer"
+  useradd \
+    --system \
+    --user-group \
+    --home-dir "$APP_HOME" \
+    --shell /usr/sbin/nologin \
+    "$APP_USER"
 
   install -d -m 0750 -o root -g "$APP_GROUP" "$CONFIG_DIR"
-  if [ ! -e "${CONFIG_DIR}/user-origin" ]; then
-    printf '%s\n' "$user_origin" | install -m 0644 -o root -g root /dev/stdin "${CONFIG_DIR}/user-origin"
-  fi
-  if [ ! -e "${CONFIG_DIR}/group-origin" ]; then
-    printf '%s\n' "$group_origin" | install -m 0644 -o root -g root /dev/stdin "${CONFIG_DIR}/group-origin"
-  fi
-  if [ ! -e "${CONFIG_DIR}/user-id" ]; then
-    id -u "$APP_USER" | install -m 0644 -o root -g root /dev/stdin "${CONFIG_DIR}/user-id"
-  fi
-  if [ ! -e "${CONFIG_DIR}/group-id" ]; then
-    getent group "$APP_GROUP" | cut -d: -f3 | install -m 0644 -o root -g root /dev/stdin "${CONFIG_DIR}/group-id"
-  fi
-  [ "$(tr -d '\r\n' < "${CONFIG_DIR}/user-id")" = "$(id -u "$APP_USER")" ] || \
-    die "current UID for ${APP_USER} does not match the installer record"
-  [ "$(tr -d '\r\n' < "${CONFIG_DIR}/group-id")" = "$(getent group "$APP_GROUP" | cut -d: -f3)" ] || \
-    die "current GID for ${APP_GROUP} does not match the installer record"
+  account_id="$(id -u "$APP_USER"):$(id -g "$APP_USER")"
+  printf '%s\n' "$account_id" | \
+    install -m 0644 -o root -g root /dev/stdin "$ACCOUNT_MARKER"
 }
 
 prepare_app_directories() {
   log "Preparing the persistent Chrome profile and OpenCLI state"
   install -d -m 0700 -o "$APP_USER" -g "$APP_GROUP" "$APP_HOME"
-  install -d -m 0700 -o "$APP_USER" -g "$APP_GROUP" "$PROFILE_DIR"
-  install -d -m 0700 -o "$APP_USER" -g "$APP_GROUP" "$OPENCLI_CONFIG_DIR"
-  install -d -m 0700 -o "$APP_USER" -g "$APP_GROUP" "${APP_HOME}/Downloads"
+  run_as_app_user install -d -m 0700 \
+    "$PROFILE_DIR" \
+    "$OPENCLI_CONFIG_DIR" \
+    "${APP_HOME}/Downloads"
   install -d -m 0750 -o root -g "$APP_GROUP" "$CONFIG_DIR"
 }
 
@@ -643,10 +546,8 @@ run_as_app_user() {
     "$@"
 }
 
-write_chrome_policy() {
-  log "Configuring Chrome to force-install the OpenCLI Browser Bridge extension"
-  install -d -m 0755 /etc/opt/chrome/policies/managed
-  install -m 0644 /dev/stdin "$POLICY_FILE" <<EOF
+render_chrome_policy() {
+  render_file chrome-opencli.json <<EOF
 {
   "ExtensionSettings": {
     "${OPENCLI_EXTENSION_ID}": {
@@ -699,8 +600,8 @@ configure_xauthority() {
   chown "$APP_USER:$APP_GROUP" "$XAUTHORITY_FILE"
 }
 
-write_environment_file() {
-  install -m 0640 -o root -g "$APP_GROUP" /dev/stdin "$ENV_FILE" <<EOF
+render_environment_file() {
+  render_file environment <<EOF
 DISPLAY=${DISPLAY_VALUE}
 HOME=${APP_HOME}
 OPENCLI_CONFIG_DIR=${OPENCLI_CONFIG_DIR}
@@ -709,93 +610,8 @@ LANG=C.UTF-8
 EOF
 }
 
-write_helper_scripts() {
-  install -d -m 0755 /usr/local/libexec
-  install -m 0755 /dev/stdin /usr/local/libexec/chrome-opencli-prepare-display <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-export PATH
-
-display_num="${1:-}"
-case "$display_num" in
-  ''|*[!0-9]*)
-    printf 'invalid X display number: %s\n' "$display_num" >&2
-    exit 1
-    ;;
-esac
-
-socket_dir="/tmp/.X11-unix"
-socket_file="${socket_dir}/X${display_num}"
-lock_file="/tmp/.X${display_num}-lock"
-
-if [ -L "$socket_dir" ]; then
-  printf '%s must not be a symbolic link\n' "$socket_dir" >&2
-  exit 1
-fi
-install -d -o root -g root -m 1777 "$socket_dir"
-if [ "$(stat -c '%u:%g:%a' "$socket_dir")" != "0:0:1777" ]; then
-  printf '%s must be owned by root:root with mode 1777\n' "$socket_dir" >&2
-  exit 1
-fi
-
-if [ -s "$lock_file" ]; then
-  lock_pid="$(tr -cd '0-9' < "$lock_file")"
-  if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
-    printf 'X display :%s is already owned by live PID %s\n' "$display_num" "$lock_pid" >&2
-    exit 1
-  fi
-fi
-
-if [ -S "$socket_file" ] && ss -xlH | grep -F -- "$socket_file" >/dev/null; then
-  printf 'X display :%s already has a listening socket\n' "$display_num" >&2
-  exit 1
-fi
-
-rm -f "$lock_file" "$socket_file"
-EOF
-
-  install -m 0755 /dev/stdin /usr/local/libexec/chrome-opencli-wait-display <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-export PATH
-
-display_num="${1:-}"
-xauthority="${2:-}"
-timeout="${3:-30}"
-case "$display_num" in
-  ''|*[!0-9]*) exit 1 ;;
-esac
-case "$timeout" in
-  ''|*[!0-9]*) exit 1 ;;
-esac
-[ -r "$xauthority" ] || exit 1
-
-deadline=$((SECONDS + timeout))
-while [ "$SECONDS" -lt "$deadline" ]; do
-  if DISPLAY=":${display_num}" XAUTHORITY="$xauthority" xdpyinfo >/dev/null 2>&1; then
-    exit 0
-  fi
-  sleep 0.2
-done
-
-printf 'X display :%s did not become ready within %ss\n' "$display_num" "$timeout" >&2
-exit 1
-EOF
-}
-
-write_systemd_units() {
-  log "Writing systemd units"
-  local chrome_sandbox_arg=""
-  if [ "$CHROME_NO_SANDBOX" = "1" ]; then
-    chrome_sandbox_arg="--no-sandbox"
-  fi
-
-  # Remove the bootstrap-only daemon unit created by early versions of this installer.
-  rm -f /etc/systemd/system/chrome-opencli-daemon.service
-
-  install -m 0644 /dev/stdin /etc/systemd/system/chrome-opencli.target <<'EOF'
+render_systemd_units() {
+  render_file chrome-opencli.target <<'EOF'
 [Unit]
 Description=Google Chrome, OpenCLI, and VNC stack
 Wants=chrome-opencli-xvfb.service chrome-opencli-openbox.service chrome-opencli-browser.service chrome-opencli-vnc.service
@@ -805,7 +621,7 @@ After=network-online.target
 WantedBy=multi-user.target
 EOF
 
-  install -m 0644 /dev/stdin /etc/systemd/system/chrome-opencli-xvfb.service <<EOF
+  render_file chrome-opencli-xvfb.service <<EOF
 [Unit]
 Description=Chrome OpenCLI virtual X display
 PartOf=chrome-opencli.target
@@ -815,9 +631,8 @@ Type=simple
 User=${APP_USER}
 Group=${APP_GROUP}
 EnvironmentFile=${ENV_FILE}
-ExecStartPre=+/usr/local/libexec/chrome-opencli-prepare-display ${DISPLAY_NUM}
 ExecStart=/usr/bin/Xvfb ${DISPLAY_VALUE} -screen 0 ${SCREEN_GEOMETRY}x24 -nolisten tcp -auth ${XAUTHORITY_FILE}
-ExecStartPost=/usr/local/libexec/chrome-opencli-wait-display ${DISPLAY_NUM} ${XAUTHORITY_FILE} 30
+ExecStartPost=/usr/bin/timeout 30 /bin/sh -c 'until /usr/bin/xdpyinfo >/dev/null 2>&1; do /usr/bin/sleep 0.2; done'
 Restart=always
 RestartSec=2
 
@@ -825,7 +640,7 @@ RestartSec=2
 WantedBy=chrome-opencli.target
 EOF
 
-  install -m 0644 /dev/stdin /etc/systemd/system/chrome-opencli-openbox.service <<EOF
+  render_file chrome-opencli-openbox.service <<EOF
 [Unit]
 Description=Chrome OpenCLI window manager
 Requires=chrome-opencli-xvfb.service
@@ -845,7 +660,7 @@ RestartSec=2
 WantedBy=chrome-opencli.target
 EOF
 
-  install -m 0644 /dev/stdin /etc/systemd/system/chrome-opencli-browser.service <<EOF
+  render_file chrome-opencli-browser.service <<EOF
 [Unit]
 Description=Google Chrome with OpenCLI Browser Bridge
 Documentation=https://chromewebstore.google.com/detail/opencli/${OPENCLI_EXTENSION_ID}
@@ -865,7 +680,7 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 RuntimeDirectory=chrome-opencli
 RuntimeDirectoryMode=0700
 UMask=0077
-ExecStart=/usr/bin/dbus-run-session -- /usr/bin/google-chrome-stable --user-data-dir=${PROFILE_DIR} --no-first-run --no-default-browser-check --disable-dev-shm-usage --disable-session-crashed-bubble --password-store=basic --window-size=${SCREEN_GEOMETRY/x/,} ${chrome_sandbox_arg} about:blank
+ExecStart=/usr/bin/dbus-run-session -- /usr/bin/google-chrome-stable --user-data-dir=${PROFILE_DIR} --no-first-run --no-default-browser-check --disable-dev-shm-usage --disable-session-crashed-bubble --password-store=basic --window-size=${SCREEN_GEOMETRY/x/,} about:blank
 Restart=always
 RestartSec=3
 TimeoutStopSec=30
@@ -874,7 +689,7 @@ TimeoutStopSec=30
 WantedBy=chrome-opencli.target
 EOF
 
-  install -m 0644 /dev/stdin /etc/systemd/system/chrome-opencli-vnc.service <<EOF
+  render_file chrome-opencli-vnc.service <<EOF
 [Unit]
 Description=Chrome OpenCLI VNC server
 Requires=chrome-opencli-xvfb.service
@@ -895,14 +710,24 @@ WantedBy=chrome-opencli.target
 EOF
 }
 
-enable_services() {
-  systemctl daemon-reload
-  systemctl reset-failed \
+install_rendered_files() {
+  local unit
+  log "Installing Chrome policy and systemd units"
+  install -d -m 0755 /etc/opt/chrome/policies/managed
+  install -m 0644 "${TMP_DIR}/chrome-opencli.json" "$POLICY_FILE"
+  install -m 0640 -o root -g "$APP_GROUP" "${TMP_DIR}/environment" "$ENV_FILE"
+  for unit in \
+    chrome-opencli.target \
     chrome-opencli-xvfb.service \
     chrome-opencli-openbox.service \
     chrome-opencli-browser.service \
-    chrome-opencli-vnc.service >/dev/null 2>&1 || true
-  STACK_STARTED=1
+    chrome-opencli-vnc.service; do
+    install -m 0644 "${TMP_DIR}/${unit}" "/etc/systemd/system/${unit}"
+  done
+}
+
+enable_services() {
+  systemctl daemon-reload
   systemctl start chrome-opencli.target
 }
 
@@ -925,31 +750,6 @@ assert_services_active() {
   done
 }
 
-verify_vnc_listener() {
-  local deadline vnc_lines="" address
-  deadline=$((SECONDS + 15))
-  while [ "$SECONDS" -lt "$deadline" ]; do
-    vnc_lines="$(ss -ltnpH | awk -v port="$VNC_PORT" '$4 ~ (":" port "$") && $0 ~ /"x11vnc"/')"
-    if [ -n "$vnc_lines" ]; then
-      while read -r address; do
-        case "$address" in
-          *\[*|*::*) die "x11vnc unexpectedly opened an IPv6 listener: ${address}" ;;
-        esac
-        if is_loopback_bind; then
-          [ "$address" = "127.0.0.1:${VNC_PORT}" ] || \
-            die "x11vnc unexpectedly listens on ${address}; expected only 127.0.0.1:${VNC_PORT}"
-        fi
-      done < <(awk '{print $4}' <<<"$vnc_lines")
-      return
-    fi
-    sleep 0.5
-  done
-
-  systemctl --no-pager --full status chrome-opencli-vnc.service >&2 || true
-  journalctl --no-pager -u chrome-opencli-vnc.service -n 80 >&2 || true
-  die "x11vnc is not listening on TCP port ${VNC_PORT}"
-}
-
 verify_services() {
   log "Verifying services and the OpenCLI browser connection"
   assert_services_active
@@ -960,8 +760,6 @@ verify_services() {
     doctor_output="$(run_as_app_user opencli doctor 2>&1 || true)"
     if grep -q '^\[OK\] Extension: connected' <<<"$doctor_output" && \
        grep -q '^\[OK\] Connectivity: connected' <<<"$doctor_output"; then
-      assert_services_active
-      verify_vnc_listener
       printf '%s\n' "$doctor_output"
       return
     fi
@@ -1053,17 +851,16 @@ main() {
   install_google_chrome
   install_node
   install_opencli
-  CAN_RESTORE_OLD_STACK=0
-  write_chrome_policy
+  render_chrome_policy
   configure_vnc_password
   configure_xauthority
-  write_environment_file
-  write_helper_scripts
-  write_systemd_units
+  render_environment_file
+  render_systemd_units
+  install_rendered_files
   enable_services
   verify_services
   enable_services_at_boot
-  INSTALL_SUCCEEDED=1
+  STACK_TOUCHED=0
   print_result
 }
 
