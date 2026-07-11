@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
-unset NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX NPM_CONFIG_REGISTRY NPM_CONFIG_USERCONFIG
+unset NODE_OPTIONS NODE_PATH
 
 APP_USER="chrome-opencli"
 APP_GROUP="chrome-opencli"
@@ -12,7 +12,6 @@ ACCOUNT_MARKER="${CONFIG_DIR}/managed-account"
 POLICY_FILE="/etc/opt/chrome/policies/managed/chrome-opencli.json"
 
 PURGE_DATA=0
-REMOVE_PACKAGES=0
 
 log() {
   printf '[chrome-opencli-uninstall] %s\n' "$*"
@@ -29,7 +28,6 @@ usage() {
 
 选项：
   --purge-data       删除 Chrome profile、登录状态和 VNC 密码；仅删除本脚本创建的用户和组。
-  --remove-packages  同时卸载 @jackwener/opencli 和 google-chrome-stable。
   -h, --help         显示帮助。
 
 未指定 --purge-data 时会保留 /var/lib/chrome-opencli 和 /etc/chrome-opencli。
@@ -40,7 +38,6 @@ parse_args() {
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --purge-data) PURGE_DATA=1 ;;
-      --remove-packages) REMOVE_PACKAGES=1 ;;
       -h|--help) usage; exit 0 ;;
       *) die "未知选项: $1" ;;
     esac
@@ -53,11 +50,7 @@ require_root() {
 }
 
 daemon_is_listening() {
-  if command -v ss >/dev/null 2>&1; then
-    [ -n "$(ss -ltnH | awk '$4 ~ /:19825$/ { print; exit }')" ]
-    return
-  fi
-  (exec 3<>/dev/tcp/127.0.0.1/19825) 2>/dev/null
+  [ -n "$(ss -ltnH | awk '$4 ~ /:19825$/ { print; exit }')" ]
 }
 
 stop_services() {
@@ -124,29 +117,12 @@ purge_data() {
   rm -rf -- "$APP_HOME" "$CONFIG_DIR"
 }
 
-remove_packages() {
-  [ "$REMOVE_PACKAGES" = "1" ] || return
-
-  log "正在卸载 OpenCLI 和 Google Chrome Stable"
-  if command -v npm >/dev/null 2>&1; then
-    NPM_CONFIG_USERCONFIG=/dev/null npm uninstall \
-      --global \
-      --prefix /usr/local \
-      --ignore-scripts \
-      --registry=https://registry.npmjs.org/ \
-      @jackwener/opencli
-  fi
-  DEBIAN_FRONTEND=noninteractive apt-get purge -y google-chrome-stable
-}
-
 print_result() {
   printf '\n卸载完成。\n'
   if [ "$PURGE_DATA" = "0" ]; then
     printf '已保留数据：\n  %s\n  %s\n' "$APP_HOME" "$CONFIG_DIR"
   fi
-  if [ "$REMOVE_PACKAGES" = "0" ]; then
-    printf 'Google Chrome 和全局 opencli 命令仍保留。\n'
-  fi
+  printf 'Google Chrome 和全局 opencli 命令仍保留。\n'
 }
 
 main() {
@@ -156,7 +132,6 @@ main() {
   stop_services
   remove_units_and_policy
   purge_data
-  remove_packages
   print_result
 }
 

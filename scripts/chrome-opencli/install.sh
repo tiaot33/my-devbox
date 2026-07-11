@@ -39,7 +39,6 @@ VERIFY_TIMEOUT=120
 
 TMP_DIR=""
 VNC_AUTH_ARGS=""
-VNC_PASSWORD_RESULT=""
 STACK_TOUCHED=0
 
 log() {
@@ -177,16 +176,6 @@ is_interactive() {
   [ -t 0 ] && [ "$ASSUME_YES" != "1" ]
 }
 
-prompt_value() {
-  local var_name="$1"
-  local label="$2"
-  local default_value="$3"
-  local value
-
-  read -r -p "${label}（直接回车使用 ${default_value}）: " value
-  printf -v "$var_name" '%s' "${value:-$default_value}"
-}
-
 prompt_screen_geometry() {
   [ "$USER_SET_SCREEN_GEOMETRY" = "x" ] && return
 
@@ -314,7 +303,9 @@ collect_configuration() {
   prompt_screen_geometry
   prompt_vnc_bind
   if [ "$USER_SET_VNC_PORT" != "x" ]; then
-    prompt_value VNC_PORT "VNC 端口" "$VNC_PORT"
+    local port
+    read -r -p "VNC 端口（直接回车使用 ${VNC_PORT}）: " port
+    VNC_PORT="${port:-$VNC_PORT}"
   fi
   prompt_vnc_password
 }
@@ -568,7 +559,6 @@ configure_vnc_password() {
       log "Configuring passwordless VNC because VNC_PASSWORD was explicitly set to empty"
       rm -f "$password_file" "$auth_file"
       VNC_AUTH_ARGS="-nopw"
-      VNC_PASSWORD_RESULT="<none>"
       return
     fi
   elif [ -s "$password_file" ]; then
@@ -585,7 +575,6 @@ configure_vnc_password() {
   chown "$APP_USER:$APP_GROUP" "$auth_file"
 
   VNC_AUTH_ARGS="-rfbauth ${auth_file}"
-  VNC_PASSWORD_RESULT="$VNC_PASSWORD"
 }
 
 configure_xauthority() {
@@ -615,7 +604,6 @@ render_systemd_units() {
 [Unit]
 Description=Google Chrome, OpenCLI, and VNC stack
 Wants=chrome-opencli-xvfb.service chrome-opencli-openbox.service chrome-opencli-browser.service chrome-opencli-vnc.service
-After=network-online.target
 
 [Install]
 WantedBy=multi-user.target
@@ -635,9 +623,6 @@ ExecStart=/usr/bin/Xvfb ${DISPLAY_VALUE} -screen 0 ${SCREEN_GEOMETRY}x24 -nolist
 ExecStartPost=/usr/bin/timeout 30 /bin/sh -c 'until /usr/bin/xdpyinfo >/dev/null 2>&1; do /usr/bin/sleep 0.2; done'
 Restart=always
 RestartSec=2
-
-[Install]
-WantedBy=chrome-opencli.target
 EOF
 
   render_file chrome-opencli-openbox.service <<EOF
@@ -655,9 +640,6 @@ EnvironmentFile=${ENV_FILE}
 ExecStart=/usr/bin/openbox --sm-disable
 Restart=always
 RestartSec=2
-
-[Install]
-WantedBy=chrome-opencli.target
 EOF
 
   render_file chrome-opencli-browser.service <<EOF
@@ -684,9 +666,6 @@ ExecStart=/usr/bin/dbus-run-session -- /usr/bin/google-chrome-stable --user-data
 Restart=always
 RestartSec=3
 TimeoutStopSec=30
-
-[Install]
-WantedBy=chrome-opencli.target
 EOF
 
   render_file chrome-opencli-vnc.service <<EOF
@@ -704,9 +683,6 @@ EnvironmentFile=${ENV_FILE}
 ExecStart=/usr/bin/x11vnc -display ${DISPLAY_VALUE} -auth ${XAUTHORITY_FILE} ${VNC_AUTH_ARGS} -rfbport ${VNC_PORT} -no6 -listen ${VNC_BIND} -forever -shared -noxdamage -repeat -xkb
 Restart=always
 RestartSec=2
-
-[Install]
-WantedBy=chrome-opencli.target
 EOF
 }
 
@@ -724,15 +700,6 @@ install_rendered_files() {
     chrome-opencli-vnc.service; do
     install -m 0644 "${TMP_DIR}/${unit}" "/etc/systemd/system/${unit}"
   done
-}
-
-enable_services() {
-  systemctl daemon-reload
-  systemctl start chrome-opencli.target
-}
-
-enable_services_at_boot() {
-  systemctl enable chrome-opencli.target >/dev/null
 }
 
 assert_services_active() {
@@ -774,63 +741,19 @@ verify_services() {
 }
 
 print_result() {
-  local server_ip opencli_version chrome_version
+  local server_ip
   server_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
   [ -n "$server_ip" ] || server_ip="<server-ip>"
-  opencli_version="$(run_as_app_user /usr/local/bin/opencli --version)"
-  chrome_version="$(google-chrome-stable --version)"
-
-  cat <<EOF
-
-Installation completed.
-
-Versions:
-  Chrome: ${chrome_version}
-  OpenCLI: ${opencli_version}
-  Extension ID: ${OPENCLI_EXTENSION_ID}
-
-VNC:
-  bind: ${VNC_BIND}
-  port: ${VNC_PORT}
-  password: ${VNC_PASSWORD_RESULT}
-EOF
+  printf '\n安装完成。\nVNC 密码: %s\n' "${VNC_PASSWORD:-<none>}"
 
   if is_loopback_bind; then
-    cat <<EOF
-
-Secure remote access (run on your computer):
-  ssh -N -L ${VNC_PORT}:127.0.0.1:${VNC_PORT} <ssh-user>@${server_ip}
-
-Then connect your VNC client to:
-  127.0.0.1:${VNC_PORT}
-EOF
+    printf 'SSH 隧道:\n  ssh -N -L %s:127.0.0.1:%s <ssh-user>@%s\n' \
+      "$VNC_PORT" "$VNC_PORT" "$server_ip"
+    printf 'VNC 地址: 127.0.0.1:%s\n' "$VNC_PORT"
   else
-    cat <<EOF
-
-VNC endpoint:
-  ${server_ip}:${VNC_PORT}
-
-WARNING: VNC traffic is not end-to-end encrypted. Restrict this port with a firewall or VPN.
-EOF
+    printf 'VNC 地址: %s:%s\n' "$server_ip" "$VNC_PORT"
+    printf '警告: 请使用防火墙或 VPN 限制来源。\n'
   fi
-
-  cat <<EOF
-
-Persistent Chrome profile:
-  ${PROFILE_DIR}
-
-Service management:
-  systemctl status chrome-opencli.target
-  systemctl restart chrome-opencli.target
-  journalctl -u chrome-opencli-browser -f
-
-OpenCLI checks:
-  opencli --version
-  opencli doctor
-
-Use VNC to sign in to websites in Chrome. The profile and login state survive service restarts.
-Chrome displays "Managed by your organization" because the machine policy installs OpenCLI automatically.
-EOF
 }
 
 main() {
@@ -857,9 +780,10 @@ main() {
   render_environment_file
   render_systemd_units
   install_rendered_files
-  enable_services
+  systemctl daemon-reload
+  systemctl start chrome-opencli.target
   verify_services
-  enable_services_at_boot
+  systemctl enable chrome-opencli.target >/dev/null
   STACK_TOUCHED=0
   print_result
 }

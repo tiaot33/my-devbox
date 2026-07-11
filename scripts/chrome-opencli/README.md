@@ -80,17 +80,6 @@ ASSUME_YES=1 sudo -E bash scripts/chrome-opencli/install.sh
 | `VNC_PORT` | `5900` | VNC 端口 |
 | `VNC_PASSWORD` | 未设置 | 首次随机生成，重装保留；显式置空表示无密码 |
 
-例如：
-
-```bash
-ASSUME_YES=1 \
-SCREEN_GEOMETRY=1440x900 \
-VNC_BIND=0.0.0.0 \
-VNC_PORT=5901 \
-VNC_PASSWORD='aB3_9xQ2' \
-sudo -E bash scripts/chrome-opencli/install.sh
-```
-
 无密码模式只允许 `VNC_BIND=127.0.0.1`：
 
 ```bash
@@ -154,13 +143,8 @@ sudo bash scripts/chrome-opencli/uninstall.sh
 sudo bash scripts/chrome-opencli/uninstall.sh --purge-data
 ```
 
-同时卸载 Chrome 和 OpenCLI：
-
-```bash
-sudo bash scripts/chrome-opencli/uninstall.sh --purge-data --remove-packages
-```
-
 `--purge-data` 不可恢复，执行前应备份 `/var/lib/chrome-opencli`。
+Google Chrome 和全局 `opencli` 命令始终保留，需要时请通过系统包管理器单独卸载。
 
 ## 排查与安全
 
