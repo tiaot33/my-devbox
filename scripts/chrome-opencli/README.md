@@ -37,15 +37,19 @@ sudo bash scripts/chrome-opencli/install.sh
 
 推荐保持默认值：`1920x1080`、`127.0.0.1:5900` 和随机密码。重复安装会保留 Chrome profile、网站登录状态和已有 VNC 密码。
 
-从 GitHub 下载时先保存脚本，再交互执行：
+主脚本下载地址：
+
+<https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/chrome-opencli/install.sh>
+
+一条命令自动下载并交互执行：
 
 ```bash
-tmp="$(mktemp)" && \
-curl -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/chrome-opencli/install.sh -o "$tmp" && \
-sudo bash "$tmp"
+tmp="$(mktemp)" && curl -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/chrome-opencli/install.sh -o "$tmp" && sudo bash "$tmp"
 ```
 
-不要使用 `curl ... | sudo bash`，管道会占用交互输入。
+> 建议先打开上面的 GitHub raw 链接审阅脚本内容。
+>
+> 不要使用 `curl ... | sudo bash`，管道会占用交互输入。
 
 ## VNC 连接
 
