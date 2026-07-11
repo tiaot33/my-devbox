@@ -44,15 +44,17 @@ scripts/cloak-browser-scripts/install.sh
 一条命令自动下载并执行：
 
 ```bash
-sudo bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/cloak-browser-scripts/install.sh)
+tmp="$(mktemp)" && curl -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/cloak-browser-scripts/install.sh -o "$tmp" && sudo bash "$tmp"
 ```
 
 > 建议先打开上面的 GitHub raw 链接审阅脚本内容，再执行远程脚本。
+>
+> 不要用 `curl ... | bash` 或 `wget ... | bash` 跑交互安装。管道会占用脚本的标准输入，`read` 不能正常从终端读取交互选项。
 
 无人值守安装也可以直接传环境变量：
 
 ```bash
-ASSUME_YES=1 sudo -E bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/cloak-browser-scripts/install.sh)
+tmp="$(mktemp)" && curl -fsSL https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/cloak-browser-scripts/install.sh -o "$tmp" && ASSUME_YES=1 sudo -E bash "$tmp"
 ```
 
 ### 本地运行
@@ -329,6 +331,14 @@ ss -lntp | grep 5900
 ```bash
 curl http://127.0.0.1:9222/json/version
 ```
+
+安装器自身会先检查 `cloakserve` 的健康接口：
+
+```bash
+curl http://127.0.0.1:9222/
+```
+
+`systemctl enable --now cloakserve.service` 返回时，只代表 systemd 已经启动服务进程，不代表 HTTP 端口已经完成监听。安装器会等待端口就绪；如果超时，会打印 `cloakserve.service` 状态和最近日志。
 
 ## 网络依赖
 

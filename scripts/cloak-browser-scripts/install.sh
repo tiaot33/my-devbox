@@ -713,6 +713,24 @@ enable_services() {
   fi
 }
 
+wait_for_http() {
+  local url="$1"
+  local name="$2"
+  local timeout="${3:-30}"
+  local deadline
+  deadline=$((SECONDS + timeout))
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if curl -fsS --max-time 2 "$url" >/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  printf '[cloakbrowser-install] ERROR: %s did not become ready after %ss: %s\n' "$name" "$timeout" "$url" >&2
+  return 1
+}
+
 verify_install() {
   log "Verifying install"
   run_as_app_user env DISPLAY="$DISPLAY_VALUE" "$APP_HOME/.venv/bin/python" -m cloakbrowser info --quick
@@ -720,8 +738,17 @@ verify_install() {
   systemctl is-active --quiet cloakbrowser-openbox.service
   systemctl is-active --quiet cloakbrowser-vnc.service
   if [ "$ENABLE_CLOAKSERVE" = "1" ]; then
+    local cdp_check_host="127.0.0.1"
+    if [ "$CDP_BIND" = "localhost" ]; then
+      cdp_check_host="localhost"
+    fi
+
     systemctl is-active --quiet cloakserve.service
-    curl -fsS "http://127.0.0.1:${CDP_PORT}/" >/dev/null
+    if ! wait_for_http "http://${cdp_check_host}:${CDP_PORT}/" "cloakserve" 30; then
+      systemctl --no-pager --full status cloakserve.service >&2 || true
+      journalctl --no-pager -u cloakserve.service -n 80 >&2 || true
+      return 1
+    fi
   fi
 }
 
