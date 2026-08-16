@@ -2,6 +2,9 @@
 # =============================================================================
 # devbox-init — Debian/Ubuntu 无头开发环境初始化脚本
 #
+#   DEPRECATED: 请改用 scripts/devbox-init/mise/install.sh
+#   本脚本仍可用，但软件清单不再作为推荐入口维护。
+#
 #   安装系统包 · 字体 · Starship 提示符 · 终端工具 · dotfiles · Git 配置
 #
 #   运行:   bash devbox-init.sh
@@ -286,6 +289,7 @@ printf '  ╚══════════════════════�
 printf '\033[0m'
 
 log "📋 目标用户: \033[1m$DISPATCHER\033[0m (主目录: $DISPATCHER_HOME)"
+warn "本脚本已弃用，请改用 scripts/devbox-init/mise/install.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 📦 APT 基础包
@@ -531,8 +535,8 @@ ok "终端工具步骤完成"
 # ═══════════════════════════════════════════════════════════════════════════
 # 📝 Dotfiles
 # ═══════════════════════════════════════════════════════════════════════════
-log "📝 Dotfiles — bash · tmux · vim · git · editorconfig"
-ensure_dir_user "$DISPATCHER_HOME/.config/starship" "$DISPATCHER_HOME/.config/atuin" "$DISPATCHER_HOME/.config/nvim" "$DISPATCHER_HOME/.config/shell"
+log "📝 Dotfiles — bash · tmux · vim · git · lazygit · editorconfig"
+ensure_dir_user "$DISPATCHER_HOME/.config/starship" "$DISPATCHER_HOME/.config/atuin" "$DISPATCHER_HOME/.config/nvim" "$DISPATCHER_HOME/.config/shell" "$DISPATCHER_HOME/.config/lazygit"
 
 step "写入 ~/.bashrc.generated ..."
 write_user_file "$DISPATCHER_HOME/.bashrc.generated" <<'EOF_BASHRC'
@@ -842,6 +846,58 @@ enabled = true
 autostart = true
 EOF_ATUIN
 ok "$DISPATCHER_HOME/.config/atuin/config.toml 已写入"
+
+step "写入 ~/.config/lazygit/config.yml ..."
+write_user_file "$DISPATCHER_HOME/.config/lazygit/config.yml" <<'EOF_LAZYGIT'
+# ~/.config/lazygit/config.yml - 由 devbox-init 生成
+# 请不要手改此文件；重新运行初始化脚本会覆盖。
+# 官方文档: https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md
+
+gui:
+  # 'auto' 会跟随系统 locale；这里固定为简体中文
+  language: zh-CN
+  # 已安装 Nerd Font (ComicShannsMono)，启用图标
+  nerdFontsVersion: "3"
+  # 启用鼠标点击与滚动
+  mouseEvents: true
+  # 更紧凑的时间显示
+  timeFormat: "2006-01-02"
+  shortTimeFormat: "15:04"
+  theme:
+    activeBorderColor:
+      - green
+      - bold
+    inactiveBorderColor:
+      - default
+    selectedLineBgColor:
+      - blue
+    cherryPickedCommitBgColor:
+      - cyan
+    cherryPickedCommitFgColor:
+      - blue
+    unstagedChangesColor:
+      - red
+    defaultFgColor:
+      - default
+    searchingActiveBorderColor:
+      - cyan
+
+git:
+  paging:
+    colorArg: always
+    useConfig: false
+  commit:
+    signOff: false
+  log:
+    order: "topo-order"
+    showGraph: "when-maximised"
+
+confirmOnQuit: false
+notARepository: "prompt"
+update:
+  method: never
+EOF_LAZYGIT
+ok "$DISPATCHER_HOME/.config/lazygit/config.yml 已写入"
 ok "所有 dotfiles 写入完成"
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -909,6 +965,7 @@ summary_add edit "$DISPATCHER_HOME/.config/shell/aliases.sh：devbox 默认 alia
 summary_add edit "$DISPATCHER_HOME/.bashrc.generated：devbox shell 主配置；重新运行脚本会覆盖"
 summary_add edit "$DISPATCHER_HOME/.config/starship.toml：Starship 提示符配置；重新运行脚本可能覆盖"
 summary_add edit "$DISPATCHER_HOME/.config/atuin/config.toml：Atuin 配置；重新运行脚本会覆盖"
+summary_add edit "$DISPATCHER_HOME/.config/lazygit/config.yml：lazygit 配置 (含简体中文界面)；重新运行脚本会覆盖"
 summary_add edit "$DISPATCHER_HOME/.tmux.conf：tmux 配置；重新运行脚本会覆盖"
 summary_add edit "$DISPATCHER_HOME/.vimrc 和 $DISPATCHER_HOME/.config/nvim/init.vim：Vim/Neovim 配置；重新运行脚本会覆盖"
 summary_add edit "$DISPATCHER_HOME/.gitconfig：Git 全局配置"

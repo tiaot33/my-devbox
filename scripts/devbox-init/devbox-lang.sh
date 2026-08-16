@@ -2,6 +2,9 @@
 # =============================================================================
 # devbox-lang — Debian/Ubuntu 多语言开发工具链一键安装脚本
 #
+#   DEPRECATED: 请改用 scripts/devbox-init/mise/install.sh
+#   语言运行时已改由 mise.toml 的 [tools] 管理。
+#
 #   支持: Node.js (fnm) / Python (uv) / Go (mise) / Bun / Deno
 #
 #   运行:   bash devbox-lang.sh
@@ -278,6 +281,7 @@ printf '  ╚══════════════════════�
 printf '\033[0m'
 
 log "📋 目标用户: \033[1m$DISPATCHER\033[0m (主目录: $DISPATCHER_HOME)"
+warn "本脚本已弃用，请改用 scripts/devbox-init/mise/install.sh"
 
 if [ "$INSTALL_ALL_NONINTERACTIVE" = "1" ]; then
   set_all_languages
@@ -304,7 +308,7 @@ if [ "${INSTALL_NODE:-1}" = "1" ]; then
     if command -v fnm >/dev/null 2>&1; then
       eval "$(fnm env --use-on-cd --shell bash)"
       fnm install --lts || true
-      fnm use --lts || true
+      fnm use lts-latest || true
       fnm default lts-latest || true
       node --version || true
       npm --version || true
@@ -338,6 +342,20 @@ done
 unset __d
 
 command -v fnm >/dev/null 2>&1 && eval "$(fnm env --use-on-cd --shell bash 2>/dev/null)"
+
+# fnm 的 --use-on-cd 会执行 `alias cd=__fnmcd`，覆盖 devbox-init 设置的 `alias cd='z'`。
+# 本块位于 ~/.bashrc 末尾（晚于 ~/.bashrc.generated），需要组合两者：
+# cd 交给 zoxide 跳转，跳转后照常触发 fnm 按目录自动切换 Node 版本。
+if command -v z >/dev/null 2>&1; then
+  unalias cd 2>/dev/null || true
+  # 必须用 `function cd` 语法：此时 alias cd 仍存在，`cd() {` 会被展开成 `__fnmcd() {`
+  function cd {
+    z "$@" || return $?
+    declare -F __fnm_use_if_file_found >/dev/null 2>&1 && __fnm_use_if_file_found
+    return 0
+  }
+fi
+
 command -v fnm >/dev/null 2>&1 && eval "$(fnm completions --shell bash 2>/dev/null)"
 command -v npm >/dev/null 2>&1 && eval "$(npm completion 2>/dev/null)"
 EOF_NODE_BASHRC
@@ -481,9 +499,7 @@ printf '  ║  %-50s ║\n' "✨ 安装完成！"
 printf '  ╚════════════════════════════════════════════════════╝\n'
 printf '\033[0m\n'
 
-cat <<EOF_SUMMARY
-  🔧 已安装语言的 shell 配置已写入 ~/.bashrc
-     Node.js / Python / Go / Deno 使用 devbox-lang 标记块；Bun 由官方安装脚本维护
-
-  🚀 执行 \033[1msource ~/.bashrc\033[0m 或新开终端即可使用
-EOF_SUMMARY
+printf '  🔧 已安装语言的 shell 配置已写入 ~/.bashrc\n'
+printf '     Node.js / Python / Go / Deno 使用 devbox-lang 标记块；Bun 由官方安装脚本维护\n'
+printf '\n'
+printf '  🚀 执行 \033[1msource ~/.bashrc\033[0m 或新开终端即可使用\n'
