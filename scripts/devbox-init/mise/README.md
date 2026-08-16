@@ -54,7 +54,7 @@ sudo bash scripts/devbox-init/mise/install.sh
 ### 安装脚本做了什么
 
 1. 用 APT 装 `ca-certificates` `curl` `git`（装 mise 之前的依赖）
-2. 按官方方式安装 [mise](https://mise.run) 到 `~/.local/bin/mise`
+2. 已有 [mise](https://mise.run) 且 ≥ `2026.7.0` 则跳过，否则装到 `~/.local/bin/mise`
 3. 接到 `~/.config/mise/`：仓库 [`mise.toml`](./mise.toml) → `conf.d/00-devbox.toml`，`dotfiles/` 链到 `conf.d/dotfiles`（mise 按 toml 所在目录解析 source）；`config.toml` 是可写文件，给 `mise use -g` 用
 4. 询问要装哪些 coding agents（非交互且未指定则跳过）
 5. 执行 `mise bootstrap --yes --update --force-dotfiles`

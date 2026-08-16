@@ -18,6 +18,8 @@ export APT_LISTCHANGES_FRONTEND=none
 
 REPO_URL="${DEVBOX_REPO_URL:-https://github.com/tiaot33/my-devbox.git}"
 MISE_INSTALL_URL="${MISE_INSTALL_URL:-https://mise.run}"
+# 与 mise.toml min_version.hard 对齐。低于这个版本读不懂本仓库的 bootstrap。
+MISE_MIN_VERSION="${MISE_MIN_VERSION:-2026.7.0}"
 
 log()  { printf '\n\033[1;34m▶ %s\033[0m\n' "$*"; }
 warn() { printf '  \033[1;33m⚠  %s\033[0m\n' "$*" >&2; }
@@ -156,12 +158,24 @@ ok "基础依赖已就绪"
 # ── 安装 mise ───────────────────────────────────────────────────────────────
 
 log "🧰 安装 / 升级 mise"
-# 官方安装器可重跑；已有旧版时也会升到当前，避免 2026.6.x 读不懂这份 bootstrap。
-$AS_USER "export PATH=\"\$HOME/.local/bin:\$PATH\"
-  curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-connrefused \"$MISE_INSTALL_URL\" | sh
-  command -v mise >/dev/null 2>&1
-  mise --version || true"
-ok "mise 可用"
+# 够新就跳过。过旧（例如 2026.6.x）读不懂这份 bootstrap，再走官方安装器。
+MISE_VER="$($AS_USER "export PATH=\"\$HOME/.local/bin:\$PATH\"
+  command -v mise >/dev/null 2>&1 || exit 0
+  mise --version 2>/dev/null" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+if [ -n "$MISE_VER" ] && [ "$(printf '%s\n%s\n' "$MISE_VER" "$MISE_MIN_VERSION" | sort -V | tail -1)" = "$MISE_VER" ]; then
+  ok "mise $MISE_VER 已满足 (>= $MISE_MIN_VERSION)，跳过安装"
+else
+  if [ -n "$MISE_VER" ]; then
+    step "mise $MISE_VER < $MISE_MIN_VERSION，升级 ..."
+  else
+    step "未检测到 mise，走官方安装器 ..."
+  fi
+  $AS_USER "export PATH=\"\$HOME/.local/bin:\$PATH\"
+    curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-connrefused \"$MISE_INSTALL_URL\" | sh
+    command -v mise >/dev/null 2>&1
+    mise --version || true"
+  ok "mise 可用"
+fi
 
 # ── 解析配置源 ──────────────────────────────────────────────────────────────
 
