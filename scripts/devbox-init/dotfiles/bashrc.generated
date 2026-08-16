@@ -57,20 +57,12 @@ stty -ixon 2>/dev/null || true
 bind 'set bell-style none' 2>/dev/null || true
 
 # ── 补全 ─────────────────────────────────────────────────────────────────────
+# 顺序：bash-completion → fzf → ble.sh → carapace → mise。
+# carapace 必须在 fzf 之后，否则 fzf 会把 git/systemctl 等改成路径补全。
+# carapace 必须在 ble.sh 之后，才能用 bash-ble 桥，避免 ble 劫持 read。
 
 if [ -f /etc/bash_completion ]; then
   source /etc/bash_completion
-fi
-
-# carapace 接管已注册 CLI 的参数补全；只桥接 bash，避免本机没有 zsh/fish 时去调它们。
-if command -v carapace >/dev/null 2>&1; then
-  export CARAPACE_BRIDGES=bash
-  source <(carapace _carapace)
-fi
-
-# carapace 没有 mise 补全器；usage 已由 mise 安装。
-if command -v mise >/dev/null 2>&1; then
-  eval "$(mise completion bash 2>/dev/null)" || true
 fi
 
 if command -v fzf >/dev/null 2>&1; then
@@ -85,9 +77,62 @@ export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 
 # ── 工具集成 (加载顺序很重要) ─────────────────────────────────────────────────
 
-# ble.sh — 必须在其他集成之前加载
+# ble.sh — 必须在 carapace / atuin 之前加载
 if [[ -s "$HOME/.local/share/blesh/ble.sh" ]]; then
   source -- "$HOME/.local/share/blesh/ble.sh" --attach=none
+fi
+
+# carapace 接管已注册 CLI 的参数补全；只桥接 bash。
+# 不要用 `carapace _carapace` 自动探测：ble 尚未 attach 时会选错脚本。
+# 原脚本的 `IFS=$'\001' read -r -d '' nospace data` 在 bash 5.3 / ble.sh
+# 包装 read 时会报: read: `    ': not a valid identifier
+_devbox_carapace_completer() {
+  export COMP_LINE COMP_POINT COMP_TYPE COMP_WORDBREAKS
+  declare -x CARAPACE_SHELL=bash
+  declare -x CARAPACE_SHELL_ALIASES="$(compgen -a)"
+  declare -x CARAPACE_SHELL_BUILTINS="$(compgen -b)"
+  declare -x CARAPACE_SHELL_FUNCTIONS="$(compgen -A function)"
+  declare -x CARAPACE_SHELL_JOBS="$(jobs 2>/dev/null | while builtin read -r line; do
+    [[ $line =~ \[([0-9]+)\] ]] && echo "%${BASH_REMATCH[1]}"
+  done)"
+  declare -x CARAPACE_SHELL_VARIABLES="$(compgen -v)"
+
+  local command="${COMP_WORDS[0]}" nospace data compline="${COMP_LINE:0:${COMP_POINT}}"
+
+  data=$(printf '%s\n' "${compline}''" | xargs carapace "${command}" bash 2>/dev/null)
+  if [ $? -eq 1 ]; then
+    data=$(printf '%s\n' "${compline}'" | xargs carapace "${command}" bash 2>/dev/null)
+    if [ $? -eq 1 ]; then
+      data=$(printf '%s\n' "${compline}\"" | xargs carapace "${command}" bash 2>/dev/null)
+    fi
+  fi
+
+  if [[ $data == *$'\001'* ]]; then
+    nospace=${data%%$'\001'*}
+    data=${data#*$'\001'}
+  else
+    nospace=
+  fi
+  mapfile -t COMPREPLY < <(printf '%s\n' "${data}")
+  unset COMPREPLY[-1]
+  [ "${nospace}" = true ] && compopt -o nospace
+  local IFS=$'\n'
+  [[ "${COMPREPLY[*]}" == "" ]] && COMPREPLY=()
+}
+
+if command -v carapace >/dev/null 2>&1; then
+  export CARAPACE_BRIDGES=bash
+  if [[ ${BLE_VERSION-} ]]; then
+    source <(carapace _carapace bash-ble)
+  else
+    source <(carapace _carapace bash)
+  fi
+  eval "$(declare -f _devbox_carapace_completer | sed '1s/_devbox_carapace_completer/_carapace_completer/')"
+fi
+
+# carapace 没有 mise 补全器；usage 已由 mise 安装。
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise completion bash 2>/dev/null)" || true
 fi
 
 # direnv
