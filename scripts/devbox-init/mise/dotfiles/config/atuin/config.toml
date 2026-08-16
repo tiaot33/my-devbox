@@ -1,0 +1,10 @@
+style = "compact"
+inline_height = 20
+show_help = false
+enter_accept = true
+filter_mode = "global"
+search_mode = "daemon-fuzzy"
+
+[daemon]
+enabled = true
+autostart = true

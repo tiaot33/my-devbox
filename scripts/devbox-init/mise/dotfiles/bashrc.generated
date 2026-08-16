@@ -1,0 +1,124 @@
+# ~/.bashrc.generated - 由 scripts/devbox-init/mise 生成
+# 请不要手改此文件；重新运行 mise bootstrap 会覆盖。
+# 个人自定义请放到 ~/.config/shell/local.sh。
+
+[[ $- != *i* ]] && return
+
+# ── 环境变量 ─────────────────────────────────────────────────────────────────
+
+export LANG=${LANG:-en_US.UTF-8}
+export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+export XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}
+export XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
+if [[ -z ${TERM:-} || ${TERM:-} == dumb ]]; then
+  export TERM=xterm-256color
+fi
+export PATH="$HOME/.local/bin:$PATH"
+
+# 必须在 command -v fzf/direnv/zoxide 等之前：mise bootstrap 会把
+# source ~/.bashrc.generated 写在 ~/.bashrc 的 activate 块前面。
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate bash)"
+fi
+
+if command -v nvim >/dev/null 2>&1; then
+  export EDITOR=nvim
+else
+  export EDITOR=vim
+fi
+export VISUAL="$EDITOR"
+export PAGER=less
+if less --help 2>&1 | grep -q -- '--mouse'; then
+  export LESS='-R -F -X -i -M --mouse --wheel-lines=3'
+else
+  export LESS='-R -F -X -i -M'
+fi
+export BAT_PAGER=less
+if command -v bat >/dev/null 2>&1; then
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+else
+  export MANPAGER='less -R'
+fi
+
+# ── Shell 行为 ───────────────────────────────────────────────────────────────
+
+export HISTSIZE=200000
+export HISTFILESIZE=400000
+export HISTCONTROL=ignoreboth:erasedups
+export HISTTIMEFORMAT='%F %T  '
+export HISTIGNORE='ls:ll:la:lt:l:history:exit:clear:bg:fg:cd:z:atuin'
+shopt -s histappend cmdhist checkwinsize globstar autocd dirspell 2>/dev/null || true
+stty -ixon 2>/dev/null || true
+bind 'set bell-style none' 2>/dev/null || true
+
+# ── 补全 ─────────────────────────────────────────────────────────────────────
+
+if [ -f /etc/bash_completion ]; then
+  source /etc/bash_completion
+fi
+
+# carapace 接管已注册 CLI 的参数补全；只桥接 bash，避免本机没有 zsh/fish 时去调它们。
+if command -v carapace >/dev/null 2>&1; then
+  export CARAPACE_BRIDGES=bash
+  source <(carapace _carapace)
+fi
+
+# carapace 没有 mise 补全器；usage 已由 mise 安装。
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise completion bash 2>/dev/null)" || true
+fi
+
+if command -v fzf >/dev/null 2>&1; then
+  eval "$(fzf --bash 2>/dev/null)" || true
+fi
+if command -v fd >/dev/null 2>&1; then
+  export FZF_DEFAULT_COMMAND='fd --type f --strip-cwd-prefix --hidden --follow --exclude .git 2>/dev/null'
+else
+  export FZF_DEFAULT_COMMAND='find . -type f 2>/dev/null'
+fi
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+
+# ── 工具集成 (加载顺序很重要) ─────────────────────────────────────────────────
+
+# ble.sh — 必须在其他集成之前加载
+if [[ -s "$HOME/.local/share/blesh/ble.sh" ]]; then
+  source -- "$HOME/.local/share/blesh/ble.sh" --attach=none
+fi
+
+# direnv
+if command -v direnv >/dev/null 2>&1; then
+  eval "$(direnv hook bash)"
+fi
+
+# zoxide — 智能 cd
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init bash)"
+  alias cd='z'
+fi
+
+# Atuin — shell 历史搜索
+if command -v atuin >/dev/null 2>&1; then
+  eval "$(atuin init bash --disable-up-arrow)"
+fi
+
+# Starship — 命令行提示符 (必须最后加载)
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+
+# ── 别名 & 实用函数 ─────────────────────────────────────────────────────────
+
+[ -f "$HOME/.config/shell/aliases.sh" ]   && source "$HOME/.config/shell/aliases.sh"
+[ -f "$HOME/.config/shell/functions.sh" ] && source "$HOME/.config/shell/functions.sh"
+[ -f "$HOME/.config/shell/local.sh" ]     && source "$HOME/.config/shell/local.sh"
+
+# ── SSH 登录 ─────────────────────────────────────────────────────────────────
+
+if [[ -n ${SSH_CONNECTION-} ]]; then
+  if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch
+  fi
+fi
+
+# ble.sh — 在所有交互式设置之后附加
+[[ ! ${BLE_VERSION-} ]] || ble-attach

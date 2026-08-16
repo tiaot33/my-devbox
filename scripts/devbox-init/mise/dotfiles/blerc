@@ -1,0 +1,10 @@
+bleopt complete_auto_complete=1
+bleopt complete_menu_complete=1
+bleopt complete_menu_style=desc
+bleopt edit_abbrev=1 2>/dev/null || true
+bleopt prompt_eol_mark='↵'
+bleopt complete_limit_auto=2000
+bleopt complete_menu_maxlines=10
+bleopt complete_ignore_case=1 2>/dev/null || true
+bleopt history_share=1
+ble-face auto_complete='fg=240,underline,italic'

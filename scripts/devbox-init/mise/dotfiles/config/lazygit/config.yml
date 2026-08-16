@@ -1,0 +1,47 @@
+# ~/.config/lazygit/config.yml - 由 scripts/devbox-init/mise 生成
+# 请不要手改此文件；重新运行 mise bootstrap 会覆盖。
+# 官方文档: https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md
+
+gui:
+  # 'auto' 会跟随系统 locale；这里固定为简体中文
+  language: zh-CN
+  # 已安装 Nerd Font (ComicShannsMono)，启用图标
+  nerdFontsVersion: "3"
+  # 启用鼠标点击与滚动
+  mouseEvents: true
+  # 更紧凑的时间显示
+  timeFormat: "2006-01-02"
+  shortTimeFormat: "15:04"
+  theme:
+    activeBorderColor:
+      - green
+      - bold
+    inactiveBorderColor:
+      - default
+    selectedLineBgColor:
+      - blue
+    cherryPickedCommitBgColor:
+      - cyan
+    cherryPickedCommitFgColor:
+      - blue
+    unstagedChangesColor:
+      - red
+    defaultFgColor:
+      - default
+    searchingActiveBorderColor:
+      - cyan
+
+git:
+  paging:
+    colorArg: always
+    useConfig: false
+  commit:
+    signOff: false
+  log:
+    order: "topo-order"
+    showGraph: "when-maximised"
+
+confirmOnQuit: false
+notARepository: "prompt"
+update:
+  method: never
