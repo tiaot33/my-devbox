@@ -1,4 +1,4 @@
-# ~/.config/shell/aliases.sh - 由 scripts/devbox-init/mise 生成
+# ~/.config/shell/aliases.sh - 由 scripts/devbox-init 生成
 # 请不要手改此文件；重新运行 mise bootstrap 会覆盖。
 # 个人 alias 请放到 ~/.config/shell/local.sh。
 

@@ -1,0 +1,259 @@
+# devbox workstation config. install.sh links this to
+# ~/.config/mise/conf.d/00-devbox.toml so it applies globally.
+# ~/.config/mise/config.toml is a real file for `mise use -g`（coding agents 等）。
+#
+# Skip a language or CLI: comment out its [tools] line, then:
+#   mise bootstrap --yes --only tools
+#
+# Apply only extras / only packages:
+#   mise bootstrap --yes --only task
+#   mise bootstrap --yes --only packages --update
+
+min_version = { hard = "2026.7.0" }
+
+# 不锁版本。清单里的 latest / lts 每次 bootstrap / upgrade 都按当时解析。
+[settings]
+lockfile = false
+
+# 装机时勾选的 agent 用这些短名：mise use -g omp
+[tool_alias]
+omp = "github:can1357/oh-my-pi"
+kimi = "npm:@moonshot-ai/kimi-code"
+
+# ── 系统包：编译器、locale、基础 Unix 工具。版本化 CLI 不放这里。 ───────────
+
+[bootstrap.packages]
+"apt:sudo" = "latest"
+"apt:ca-certificates" = "latest"
+"apt:curl" = "latest"
+"apt:wget" = "latest"
+"apt:gnupg" = "latest"
+"apt:locales" = "latest"
+"apt:tzdata" = "latest"
+"apt:bash-completion" = "latest"
+"apt:man-db" = "latest"
+"apt:fontconfig" = "latest"
+"apt:build-essential" = "latest"
+"apt:pkg-config" = "latest"
+"apt:make" = "latest"
+"apt:cmake" = "latest"
+"apt:gawk" = "latest"
+"apt:git" = "latest"
+"apt:unzip" = "latest"
+"apt:zip" = "latest"
+"apt:tar" = "latest"
+"apt:xz-utils" = "latest"
+"apt:zstd" = "latest"
+"apt:gzip" = "latest"
+"apt:file" = "latest"
+"apt:less" = "latest"
+"apt:tree" = "latest"
+"apt:vim" = "latest"
+"apt:nano" = "latest"
+"apt:tmux" = "latest"
+"apt:htop" = "latest"
+"apt:iproute2" = "latest"
+"apt:dnsutils" = "latest"
+"apt:openssh-client" = "latest"
+"apt:rsync" = "latest"
+"apt:lsof" = "latest"
+"apt:psmisc" = "latest"
+"apt:strace" = "latest"
+"apt:iputils-ping" = "latest"
+"apt:mtr-tiny" = "latest"
+"apt:libssl-dev" = "latest"
+"apt:zlib1g-dev" = "latest"
+"apt:libffi-dev" = "latest"
+"apt:libbz2-dev" = "latest"
+"apt:libreadline-dev" = "latest"
+"apt:libsqlite3-dev" = "latest"
+"apt:liblzma-dev" = "latest"
+"apt:unattended-upgrades" = "latest"
+"apt:ncdu" = "latest"
+
+[bootstrap.files."/etc/apt/apt.conf.d/20auto-upgrades"]
+content = '''
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+'''
+owner = "root"
+group = "root"
+mode = "0644"
+
+[bootstrap.mise_shell_activate]
+bashrc = "activate"
+
+[bootstrap.user]
+login_shell = "/bin/bash"
+
+# ── 用户文件（相对本 config 所在目录解析 source） ───────────────────────────
+
+[dotfiles]
+"~/.bashrc.generated" = { source = "dotfiles/bashrc.generated", mode = "copy" }
+"~/.config/shell/aliases.sh" = { source = "dotfiles/config/shell/aliases.sh", mode = "copy" }
+"~/.tmux.conf" = { source = "dotfiles/tmux.conf", mode = "copy" }
+"~/.vimrc" = { source = "dotfiles/vimrc", mode = "copy" }
+"~/.config/nvim/init.vim" = { source = "dotfiles/config/nvim/init.vim", mode = "copy" }
+"~/.inputrc" = { source = "dotfiles/inputrc", mode = "copy" }
+"~/.editorconfig" = { source = "dotfiles/editorconfig", mode = "copy" }
+"~/.gitignore_global" = { source = "dotfiles/gitignore_global", mode = "copy" }
+"~/.blerc" = { source = "dotfiles/blerc", mode = "copy" }
+"~/.config/atuin/config.toml" = { source = "dotfiles/config/atuin/config.toml", mode = "copy" }
+"~/.config/lazygit/config.yml" = { source = "dotfiles/config/lazygit/config.yml", mode = "copy" }
+"~/.config/starship.toml" = { source = "dotfiles/config/starship.toml", mode = "copy" }
+"~/.bashrc/devbox-generated" = { line = '[ -f "$HOME/.bashrc.generated" ] && source "$HOME/.bashrc.generated"' }
+
+# ── CLI + 语言运行时 ─────────────────────────────────────────────────────────
+
+[tools]
+usage = "latest"
+carapace = "latest"
+jq = "latest"
+yq = "latest"
+xh = "latest"
+"aqua:eza-community/eza" = "latest"
+bat = "latest"
+fd = "latest"
+ripgrep = "latest"
+fzf = "latest"
+btop = "latest"
+dust = "latest"
+"aqua:muesli/duf" = "latest"
+delta = "latest"
+hunk = "latest"
+lazygit = "latest"
+gh = "latest"
+starship = "latest"
+zoxide = "latest"
+atuin = "latest"
+neovim = "latest"
+direnv = "latest"
+shellcheck = "latest"
+shfmt = "latest"
+fastfetch = "latest"
+
+node = { version = "lts", postinstall = "npm i -g typescript tsx eslint prettier" }
+pnpm = "latest"
+yarn = "latest"
+python = "latest"
+uv = "latest"
+ruff = "latest"
+go = "latest"
+bun = "latest"
+deno = "latest"
+# aqua 里这三项是 go_install：mise 的 aqua backend 不支持，改走 go install。
+# delve ≥ 1.27 的 aqua 条目要预编译包，但 GitHub release 没有 linux 资产。
+"go:golang.org/x/tools/gopls" = "latest"
+"go:golang.org/x/tools/cmd/goimports" = "latest"
+"aqua:dominikh/go-tools/staticcheck" = "latest"
+"go:github.com/go-delve/delve/cmd/dlv" = "latest"
+"aqua:air-verse/air" = "latest"
+
+[tasks.bootstrap]
+description = "ble.sh、Nerd Font、herdr、git 默认、用户 shell 占位文件"
+run = 'bash "$HOME/.config/mise/bootstrap-extras.sh"'
+
+[tasks.update]
+description = "把已声明工具升到 mise.toml 范围里的最新版"
+dir = "{{cwd}}"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+mise upgrade
+mise bootstrap --yes --only tools
+'''
+
+[tasks.doctor]
+description = "检查 mise 与 bootstrap 缺项"
+dir = "{{cwd}}"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+rc=0
+mise doctor || rc=1
+mise bootstrap status --missing || rc=1
+exit "$rc"
+'''
+
+[tasks.sync]
+description = "把配置仓库对齐到 origin，再完整 bootstrap"
+dir = "{{cwd}}"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+managed="${HOME}/.local/src/my-devbox"
+src_rel="scripts/devbox-init"
+
+find_root() {
+  local cfg real dir
+  for cfg in "${HOME}/.config/mise/conf.d/00-devbox.toml" "${HOME}/.config/mise/config.toml"; do
+    [ -e "$cfg" ] || [ -L "$cfg" ] || continue
+    real="$(readlink -f "$cfg" 2>/dev/null || true)"
+    if [ -n "$real" ]; then
+      dir="$(dirname "$real")"
+      if git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git -C "$dir" rev-parse --show-toplevel
+        return 0
+      fi
+    fi
+    # 软链还指着旧的 .../mise/mise.toml 时，目标目录已经没了，往上找仓库根。
+    real="$(readlink "$cfg" 2>/dev/null || true)"
+    dir="$(dirname "$real")"
+    while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+      if [ -d "$dir/.git" ]; then
+        printf '%s\n' "$dir"
+        return 0
+      fi
+      dir="$(dirname "$dir")"
+    done
+  done
+  if [ -f "$managed/$src_rel/mise.toml" ] && [ -d "$managed/.git" ]; then
+    printf '%s\n' "$managed"
+    return 0
+  fi
+  return 1
+}
+
+root="$(find_root)" || {
+  printf 'missing devbox mise.toml (expected ~/.config/mise/conf.d/00-devbox.toml)\n' >&2
+  exit 1
+}
+if [ "$root" = "$managed" ]; then
+  git -C "$root" fetch --depth 1 origin
+  branch="$(git -C "$root" rev-parse --abbrev-ref HEAD)"
+  if [ "$branch" = HEAD ]; then
+    branch=main
+  fi
+  if git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+    git -C "$root" reset --hard "origin/$branch"
+  else
+    git -C "$root" reset --hard origin/main
+  fi
+else
+  git -C "$root" pull --ff-only
+fi
+
+src="$root/$src_rel"
+if [ ! -f "$src/mise.toml" ]; then
+  printf 'missing %s/mise.toml\n' "$src" >&2
+  exit 1
+fi
+relink() {
+  local from=$1 dest=$2
+  if [ -L "$dest" ] || [ ! -e "$dest" ]; then
+    ln -sfn "$from" "$dest"
+  else
+    rm -rf "$dest"
+    ln -sfn "$from" "$dest"
+  fi
+}
+mkdir -p "${HOME}/.config/mise/conf.d"
+relink "$src/mise.toml" "${HOME}/.config/mise/conf.d/00-devbox.toml"
+relink "$src/dotfiles" "${HOME}/.config/mise/conf.d/dotfiles"
+relink "$src/dotfiles" "${HOME}/.config/mise/dotfiles"
+relink "$src/bootstrap-extras.sh" "${HOME}/.config/mise/bootstrap-extras.sh"
+mise trust "${HOME}/.config/mise/config.toml" || true
+mise trust "${HOME}/.config/mise/conf.d/00-devbox.toml" || true
+mise bootstrap --yes --update --force-dotfiles
+'''

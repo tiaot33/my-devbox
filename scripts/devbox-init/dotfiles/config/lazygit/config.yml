@@ -1,4 +1,4 @@
-# ~/.config/lazygit/config.yml - 由 scripts/devbox-init/mise 生成
+# ~/.config/lazygit/config.yml - 由 scripts/devbox-init 生成
 # 请不要手改此文件；重新运行 mise bootstrap 会覆盖。
 # 官方文档: https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md
 
