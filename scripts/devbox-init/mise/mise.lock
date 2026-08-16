@@ -42,18 +42,6 @@ checksum = "sha256:e06eebab74b73d6b7d51a796a353824b001bea82df077706382e100815d28
 url = "https://github.com/eza-community/eza/releases/download/v0.23.5/eza_x86_64-unknown-linux-musl.tar.gz"
 url_api = "https://api.github.com/repos/eza-community/eza/releases/assets/471228890"
 
-[[tools."aqua:go-delve/delve"]]
-version = "1.27.1"
-backend = "aqua:go-delve/delve"
-
-[[tools."aqua:golang/tools/goimports"]]
-version = "0.49.0"
-backend = "aqua:golang/tools/goimports"
-
-[[tools."aqua:golang/tools/gopls"]]
-version = "gopls/v0.23.0"
-backend = "aqua:golang/tools/gopls"
-
 [[tools."aqua:muesli/duf"]]
 version = "0.9.1"
 backend = "aqua:muesli/duf"
@@ -277,6 +265,18 @@ url = "https://dl.google.com/go/go1.26.6.linux-arm64.tar.gz"
 [tools.go."platforms.linux-x64"]
 checksum = "sha256:708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89"
 url = "https://dl.google.com/go/go1.26.6.linux-amd64.tar.gz"
+
+[[tools."go:github.com/go-delve/delve/cmd/dlv"]]
+version = "1.27.1"
+backend = "go:github.com/go-delve/delve/cmd/dlv"
+
+[[tools."go:golang.org/x/tools/cmd/goimports"]]
+version = "0.49.0"
+backend = "go:golang.org/x/tools/cmd/goimports"
+
+[[tools."go:golang.org/x/tools/gopls"]]
+version = "0.23.0"
+backend = "go:golang.org/x/tools/gopls"
 
 [[tools.hunk]]
 version = "0.18.2"

@@ -136,10 +136,12 @@ ruff = "latest"
 go = "latest"
 bun = "latest"
 deno = "latest"
-"aqua:golang/tools/gopls" = "latest"
-"aqua:golang/tools/goimports" = "latest"
+# aqua 里这三项是 go_install：mise 的 aqua backend 不支持，改走 go install。
+# delve ≥ 1.27 的 aqua 条目要预编译包，但 GitHub release 没有 linux 资产。
+"go:golang.org/x/tools/gopls" = "latest"
+"go:golang.org/x/tools/cmd/goimports" = "latest"
 "aqua:dominikh/go-tools/staticcheck" = "latest"
-"aqua:go-delve/delve" = "latest"
+"go:github.com/go-delve/delve/cmd/dlv" = "latest"
 "aqua:air-verse/air" = "latest"
 
 [tasks.bootstrap]
