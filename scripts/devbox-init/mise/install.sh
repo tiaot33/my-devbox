@@ -246,6 +246,8 @@ $AS_USER "set -euo pipefail
     fi
   }
   relink $(printf '%q' "$SRC/mise.toml") \"\$HOME/.config/mise/conf.d/00-devbox.toml\"
+  # mise 按 config 所在目录解析 source=；toml 在 conf.d/ 里，dotfiles 必须在旁边。
+  relink $(printf '%q' "$SRC/dotfiles") \"\$HOME/.config/mise/conf.d/dotfiles\"
   relink $(printf '%q' "$SRC/dotfiles") \"\$HOME/.config/mise/dotfiles\"
   relink $(printf '%q' "$SRC/bootstrap-extras.sh") \"\$HOME/.config/mise/bootstrap-extras.sh\"
   # 以前把仓库 mise.toml 链成 config.toml，mise use -g 会改仓库。改成可写文件。
