@@ -128,24 +128,6 @@ printf '\033[0m'
 
 log "📋 目标用户: \033[1m$DISPATCHER\033[0m (主目录: $DISPATCHER_HOME)"
 
-# 旧官方安装器写进 login shell 的 source 行；目录已删时每次 bash -lc 都会报错。
-# 不用 -l：否则清自己的时候还会再 source 一遍坏掉的 .profile。
-if [ "$DISPATCHER" = "$(id -un)" ]; then
-  CLEAN_SH="bash -c"
-else
-  CLEAN_SH="sudo -H -u $DISPATCHER bash -c"
-fi
-$CLEAN_SH 'for f in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc"; do
-  [ -f "$f" ] || continue
-  tmp=$(mktemp)
-  grep -v "/.atuin/bin/env" "$f" | grep -v "/.deno/env" > "$tmp"
-  if ! cmp -s "$f" "$tmp"; then
-    cat "$tmp" > "$f"
-    printf "cleaned %s\n" "$f"
-  fi
-  rm -f "$tmp"
-done'
-
 # ── 鸡生蛋：curl / git / ca-certificates ────────────────────────────────────
 
 log "📦 安装 mise 之前的系统依赖"
@@ -265,7 +247,6 @@ $AS_USER "set -euo pipefail
   relink $(printf '%q' "$SRC/dotfiles") \"\$HOME/.config/mise/conf.d/dotfiles\"
   relink $(printf '%q' "$SRC/dotfiles") \"\$HOME/.config/mise/dotfiles\"
   relink $(printf '%q' "$SRC/bootstrap-extras.sh") \"\$HOME/.config/mise/bootstrap-extras.sh\"
-  # 以前把仓库 mise.toml 链成 config.toml，mise use -g 会改仓库。改成可写文件。
   cfg=\"\$HOME/.config/mise/config.toml\"
   if [ -L \"\$cfg\" ]; then
     rm -f \"\$cfg\"
@@ -276,14 +257,7 @@ $AS_USER "set -euo pipefail
 # Workstation defaults: ~/.config/mise/conf.d/00-devbox.toml
 # Add/remove: mise use -g <tool> / mise unuse -g <tool>
 EOF_MISE_USER
-  fi
-  agents_frag=\"\$HOME/.config/mise/conf.d/coding-agents.toml\"
-  if [ -f \"\$agents_frag\" ]; then
-    printf '\n' >> \"\$cfg\"
-    grep -v '^#' \"\$agents_frag\" >> \"\$cfg\" || true
-    rm -f \"\$agents_frag\"
-  fi
-  rm -f \"\$HOME/.config/mise/install-agents.sh\" \"\$HOME/.config/mise/mise.lock\" \"\$HOME/.config/mise/coding-agents.selected\""
+  fi"
 ok "$DISPATCHER_HOME/.config/mise/conf.d/00-devbox.toml → $SRC/mise.toml"
 
 # ── mise bootstrap ──────────────────────────────────────────────────────────

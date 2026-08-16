@@ -182,43 +182,21 @@ dir = "{{cwd}}"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-managed="${HOME}/.local/src/my-devbox"
-src_rel="scripts/devbox-init"
-
-find_root() {
-  local cfg real dir
-  for cfg in "${HOME}/.config/mise/conf.d/00-devbox.toml" "${HOME}/.config/mise/config.toml"; do
-    [ -e "$cfg" ] || [ -L "$cfg" ] || continue
-    real="$(readlink -f "$cfg" 2>/dev/null || true)"
-    if [ -n "$real" ]; then
-      dir="$(dirname "$real")"
-      if git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        git -C "$dir" rev-parse --show-toplevel
-        return 0
-      fi
-    fi
-    # 软链还指着旧的 .../mise/mise.toml 时，目标目录已经没了，往上找仓库根。
-    real="$(readlink "$cfg" 2>/dev/null || true)"
-    dir="$(dirname "$real")"
-    while [ -n "$dir" ] && [ "$dir" != "/" ]; do
-      if [ -d "$dir/.git" ]; then
-        printf '%s\n' "$dir"
-        return 0
-      fi
-      dir="$(dirname "$dir")"
-    done
-  done
-  if [ -f "$managed/$src_rel/mise.toml" ] && [ -d "$managed/.git" ]; then
-    printf '%s\n' "$managed"
-    return 0
+root=""
+for cfg in "${HOME}/.config/mise/conf.d/00-devbox.toml" "${HOME}/.config/mise/config.toml"; do
+  [ -e "$cfg" ] || continue
+  real="$(readlink -f "$cfg")"
+  dir="$(dirname "$real")"
+  if root="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)"; then
+    break
   fi
-  return 1
-}
-
-root="$(find_root)" || {
+  root=""
+done
+if [ -z "$root" ]; then
   printf 'missing devbox mise.toml (expected ~/.config/mise/conf.d/00-devbox.toml)\n' >&2
   exit 1
-}
+fi
+managed="${HOME}/.local/src/my-devbox"
 if [ "$root" = "$managed" ]; then
   git -C "$root" fetch --depth 1 origin
   branch="$(git -C "$root" rev-parse --abbrev-ref HEAD)"
@@ -233,27 +211,5 @@ if [ "$root" = "$managed" ]; then
 else
   git -C "$root" pull --ff-only
 fi
-
-src="$root/$src_rel"
-if [ ! -f "$src/mise.toml" ]; then
-  printf 'missing %s/mise.toml\n' "$src" >&2
-  exit 1
-fi
-relink() {
-  local from=$1 dest=$2
-  if [ -L "$dest" ] || [ ! -e "$dest" ]; then
-    ln -sfn "$from" "$dest"
-  else
-    rm -rf "$dest"
-    ln -sfn "$from" "$dest"
-  fi
-}
-mkdir -p "${HOME}/.config/mise/conf.d"
-relink "$src/mise.toml" "${HOME}/.config/mise/conf.d/00-devbox.toml"
-relink "$src/dotfiles" "${HOME}/.config/mise/conf.d/dotfiles"
-relink "$src/dotfiles" "${HOME}/.config/mise/dotfiles"
-relink "$src/bootstrap-extras.sh" "${HOME}/.config/mise/bootstrap-extras.sh"
-mise trust "${HOME}/.config/mise/config.toml" || true
-mise trust "${HOME}/.config/mise/conf.d/00-devbox.toml" || true
 mise bootstrap --yes --update --force-dotfiles
 '''
