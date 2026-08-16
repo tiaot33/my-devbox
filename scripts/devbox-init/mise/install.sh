@@ -212,7 +212,8 @@ if [ ! -f "$AGENT_SCRIPT" ]; then
   AGENTS_SPEC=""
   AGENTS_SPEC_SET=1
 elif [ "$AGENTS_SPEC_SET" = 0 ]; then
-  if [ -t 0 ] && [ -t 1 ]; then
+  # 用 /dev/tty：菜单在 $(...) 里也不能丢。wget|bash 时 stdin 也不是终端。
+  if [ -r /dev/tty ] || [ -t 0 ]; then
     log "🤖 选择 coding agents"
     AGENTS_SPEC="$(bash "$AGENT_SCRIPT" --prompt)"
     AGENTS_SPEC_SET=1

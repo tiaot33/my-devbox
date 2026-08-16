@@ -190,6 +190,20 @@ emit_selected() {
   printf '%s\n' "${SELECTED_IDS[*]-}"
 }
 
+# 菜单走 stderr、结果走 stdout（给 $(...) 捕获）。读输入必须用 /dev/tty，
+# 否则 --prompt 在命令替换里 stdout 不是终端，会被当成非交互直接跳过。
+can_prompt() {
+  [ -r /dev/tty ] || [ -t 0 ]
+}
+
+read_reply() {
+  if [ -r /dev/tty ]; then
+    IFS= read -r reply < /dev/tty
+  else
+    IFS= read -r reply
+  fi
+}
+
 prompt_selection() {
   local reply tries=0
   printf '\n' >&2
@@ -198,7 +212,7 @@ prompt_selection() {
   printf '  输入编号或 id，逗号/空格分隔；a=全部；回车=不装\n' >&2
   while [ "$tries" -lt 3 ]; do
     printf '  > ' >&2
-    if ! IFS= read -r reply; then
+    if ! read_reply; then
       reply=""
     fi
     if parse_selection "$reply"; then
@@ -315,7 +329,7 @@ case "$MODE" in
       emit_selected
       exit 0
     fi
-    if [ -t 0 ] && [ -t 1 ]; then
+    if can_prompt; then
       prompt_selection
     else
       printf '\n'
@@ -325,7 +339,7 @@ case "$MODE" in
 esac
 
 if [ "$AGENTS_SPEC_SET" = 0 ]; then
-  if [ -t 0 ] && [ -t 1 ]; then
+  if can_prompt; then
     prompt_selection >/dev/null
   else
     skip "非交互且未指定 --agents / DEVBOX_AGENTS，不安装 coding agents"
