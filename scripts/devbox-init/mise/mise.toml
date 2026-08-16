@@ -1,5 +1,6 @@
-# devbox workstation config. install.sh links this to ~/.config/mise/config.toml
-# so tools stay on PATH in every directory.
+# devbox workstation config. install.sh links this to
+# ~/.config/mise/conf.d/00-devbox.toml so it applies globally.
+# ~/.config/mise/config.toml is a real file for `mise use -g`（coding agents 等）。
 #
 # Skip a language or CLI: comment out its [tools] line, then:
 #   mise bootstrap --yes --only tools
@@ -13,6 +14,11 @@ min_version = { hard = "2026.7.0" }
 # 不锁版本。清单里的 latest / lts 每次 bootstrap / upgrade 都按当时解析。
 [settings]
 lockfile = false
+
+# 装机时勾选的 agent 用这些短名：mise use -g omp
+[tool_alias]
+omp = "github:can1357/oh-my-pi"
+kimi = "npm:@moonshot-ai/kimi-code"
 
 # ── 系统包：编译器、locale、基础 Unix 工具。版本化 CLI 不放这里。 ───────────
 
@@ -148,11 +154,6 @@ deno = "latest"
 description = "ble.sh、Nerd Font、herdr、git 默认、用户 shell 占位文件"
 run = 'bash "$HOME/.config/mise/bootstrap-extras.sh"'
 
-[tasks.agents]
-description = "选择并安装 coding agent 预设（默认不装）"
-dir = "{{cwd}}"
-run = 'bash "$HOME/.config/mise/install-agents.sh"'
-
 [tasks.update]
 description = "把已声明工具升到 mise.toml 范围里的最新版"
 dir = "{{cwd}}"
@@ -181,14 +182,20 @@ dir = "{{cwd}}"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-cfg="${HOME}/.config/mise/config.toml"
-if [ ! -e "$cfg" ]; then
-  printf 'missing %s\n' "$cfg" >&2
+root=""
+for cfg in "${HOME}/.config/mise/conf.d/00-devbox.toml" "${HOME}/.config/mise/config.toml"; do
+  [ -e "$cfg" ] || continue
+  real="$(readlink -f "$cfg")"
+  dir="$(dirname "$real")"
+  if root="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)"; then
+    break
+  fi
+  root=""
+done
+if [ -z "$root" ]; then
+  printf 'missing devbox mise.toml (expected ~/.config/mise/conf.d/00-devbox.toml)\n' >&2
   exit 1
 fi
-real="$(readlink -f "$cfg")"
-dir="$(dirname "$real")"
-root="$(git -C "$dir" rev-parse --show-toplevel)"
 managed="${HOME}/.local/src/my-devbox"
 if [ "$root" = "$managed" ]; then
   git -C "$root" fetch --depth 1 origin

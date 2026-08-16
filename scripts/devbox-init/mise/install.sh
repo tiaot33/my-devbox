@@ -2,8 +2,8 @@
 # =============================================================================
 # devbox-init/mise — 用 mise 初始化 Debian/Ubuntu 无头开发机
 #
-#   装 mise → 把本目录接到 ~/.config/mise → mise bootstrap
-#   coding agents 默认不装，装机时选择或之后 `mise run agents`
+#   装 mise → 把本目录接到 ~/.config/mise/conf.d → mise bootstrap
+#   coding agents 默认不装，装机时选择；之后用 mise use -g / mise unuse -g
 #
 #   运行:   bash install.sh
 #           sudo bash install.sh
@@ -234,7 +234,7 @@ fi
 
 log "🔗 连接到 ~/.config/mise"
 $AS_USER "set -euo pipefail
-  mkdir -p \"\$HOME/.config/mise\" \"\$HOME/.local/bin\" \"\$HOME/.local/src\" \"\$HOME/.local/share/fonts\" \"\$HOME/.config\" \"\$HOME/.cache\"
+  mkdir -p \"\$HOME/.config/mise/conf.d\" \"\$HOME/.local/bin\" \"\$HOME/.local/src\" \"\$HOME/.local/share/fonts\" \"\$HOME/.config\" \"\$HOME/.cache\"
   relink() {
     src=\$1 dest=\$2
     # ln -sfn 无法替换同名真目录，会在里面再链一层。
@@ -245,12 +245,29 @@ $AS_USER "set -euo pipefail
       ln -sfn \"\$src\" \"\$dest\"
     fi
   }
-  relink $(printf '%q' "$SRC/mise.toml") \"\$HOME/.config/mise/config.toml\"
+  relink $(printf '%q' "$SRC/mise.toml") \"\$HOME/.config/mise/conf.d/00-devbox.toml\"
   relink $(printf '%q' "$SRC/dotfiles") \"\$HOME/.config/mise/dotfiles\"
   relink $(printf '%q' "$SRC/bootstrap-extras.sh") \"\$HOME/.config/mise/bootstrap-extras.sh\"
-  relink $(printf '%q' "$SRC/install-agents.sh") \"\$HOME/.config/mise/install-agents.sh\"
-  rm -f \"\$HOME/.config/mise/mise.lock\""
-ok "$DISPATCHER_HOME/.config/mise/config.toml → $SRC/mise.toml"
+  # 以前把仓库 mise.toml 链成 config.toml，mise use -g 会改仓库。改成可写文件。
+  cfg=\"\$HOME/.config/mise/config.toml\"
+  if [ -L \"\$cfg\" ]; then
+    rm -f \"\$cfg\"
+  fi
+  if [ ! -e \"\$cfg\" ]; then
+    cat > \"\$cfg\" <<'EOF_MISE_USER'
+# User-global tools (coding agents, extra CLIs).
+# Workstation defaults: ~/.config/mise/conf.d/00-devbox.toml
+# Add/remove: mise use -g <tool> / mise unuse -g <tool>
+EOF_MISE_USER
+  fi
+  agents_frag=\"\$HOME/.config/mise/conf.d/coding-agents.toml\"
+  if [ -f \"\$agents_frag\" ]; then
+    printf '\n' >> \"\$cfg\"
+    grep -v '^#' \"\$agents_frag\" >> \"\$cfg\" || true
+    rm -f \"\$agents_frag\"
+  fi
+  rm -f \"\$HOME/.config/mise/install-agents.sh\" \"\$HOME/.config/mise/mise.lock\" \"\$HOME/.config/mise/coding-agents.selected\""
+ok "$DISPATCHER_HOME/.config/mise/conf.d/00-devbox.toml → $SRC/mise.toml"
 
 # ── mise bootstrap ──────────────────────────────────────────────────────────
 
@@ -258,6 +275,7 @@ log "🚀 mise bootstrap"
 $AS_USER "export PATH=\"\$HOME/.local/bin:\$PATH\"
   export MISE_YES=1
   mise trust \"\$HOME/.config/mise/config.toml\" || true
+  mise trust \"\$HOME/.config/mise/conf.d/00-devbox.toml\" || true
   mise -C \"\$HOME\" bootstrap --yes --update --force-dotfiles"
 ok "mise bootstrap 完成"
 
@@ -296,7 +314,8 @@ printf '  ╚══════════════════════�
 printf '\033[0m\n'
 
 printf '  目标用户: %s\n' "$DISPATCHER"
-printf '  配置文件: %s/.config/mise/config.toml\n' "$DISPATCHER_HOME"
+printf '  配置文件: %s/.config/mise/conf.d/00-devbox.toml\n' "$DISPATCHER_HOME"
+printf '  用户工具: %s/.config/mise/config.toml\n' "$DISPATCHER_HOME"
 printf '  源目录:   %s\n' "$SRC"
 if [ -n "${AGENTS_SPEC:-}" ]; then
   printf '  agents:   %s\n\n' "$AGENTS_SPEC"
@@ -305,10 +324,11 @@ else
 fi
 printf '  让 shell 立即生效:\n'
 printf '     \033[1msource ~/.bashrc\033[0m\n\n'
-printf '  增删工具: 编辑 %s/mise.toml 的 [tools]，然后:\n' "$SRC"
+printf '  增删工作站工具: 编辑 %s/mise.toml 的 [tools]，然后:\n' "$SRC"
 printf '     \033[1mmise bootstrap --yes --only tools\033[0m\n\n'
-printf '  以后再装 / 补装 coding agents:\n'
-printf '     \033[1mmise run agents\033[0m\n'
-printf '     \033[1mbash ~/.config/mise/install-agents.sh --agents claude,grok\033[0m\n\n'
+printf '  以后增删 coding agents（不要再跑本脚本）:\n'
+printf '     \033[1mmise use -g claude omp\033[0m\n'
+printf '     \033[1mmise unuse -g claude\033[0m\n'
+printf '     \033[1mmise ls\033[0m\n\n'
 printf '  个人 alias / 环境变量（不会被覆盖）:\n'
 printf '     ~/.config/shell/local.sh\n'
