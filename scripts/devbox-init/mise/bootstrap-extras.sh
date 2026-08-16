@@ -66,19 +66,17 @@ fi
 
 log "ComicShannsMono Nerd Font"
 font_marker="$HOME/.local/share/fonts/ComicShannsMonoNerdFont-Regular.otf"
-if [ -f "$font_marker" ] || ls "$HOME/.local/share/fonts"/ComicShannsMono* >/dev/null 2>&1; then
+if [ -f "$font_marker" ]; then
   ok "字体已存在"
 else
   font_zip=$(mktemp /tmp/ComicShannsMono.XXXXXX.zip)
-  if download https://github.com/ryanoasis/nerd-fonts/releases/latest/download/ComicShannsMono.zip "$font_zip"; then
-    if unzip -o "$font_zip" -d "$HOME/.local/share/fonts" >/dev/null; then
-      fc-cache -fv "$HOME/.local/share/fonts" >/dev/null 2>&1 || true
-      ok "字体已安装"
-    else
-      warn "字体解压失败"
-    fi
+  if download https://github.com/ryanoasis/nerd-fonts/releases/latest/download/ComicShannsMono.zip "$font_zip" &&
+     unzip -o "$font_zip" -d "$HOME/.local/share/fonts" >/dev/null &&
+     [ -f "$font_marker" ]; then
+    fc-cache -fv "$HOME/.local/share/fonts" >/dev/null 2>&1 || true
+    ok "字体已安装"
   else
-    warn "字体下载失败"
+    warn "字体安装失败"
   fi
   rm -f "$font_zip"
 fi

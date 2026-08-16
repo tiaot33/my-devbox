@@ -2,7 +2,7 @@
 
 Debian / Ubuntu 无头开发环境初始化。
 
-**推荐入口**：[`mise/`](./mise/) — 系统包、CLI、语言工具链和 dotfiles 全部交给 [mise](https://mise.jdx.dev/) 声明式管理。
+**推荐入口**：[`mise/`](./mise/) — 系统包、CLI、语言工具链和 dotfiles 全部交给 [mise](https://mise.jdx.dev/) 声明式管理。Coding agent 是可选预设，默认不装。
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/mise/install.sh)

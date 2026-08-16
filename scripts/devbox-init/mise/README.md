@@ -2,6 +2,8 @@
 
 Debian / Ubuntu 无头开发机：一条命令装好系统包、现代 CLI、语言工具链和 dotfiles。**软件一律由 [mise](https://mise.jdx.dev/) 声明式管理**。
 
+Coding agent（Claude Code、Codex、Grok Build 等）是**可选预设**，默认一个都不装。装机时勾选，或之后 `mise run agents`。
+
 旧入口 `../devbox-init.sh` 和 `../devbox-lang.sh` 仍可运行，但不再作为推荐路径维护。新机器请走本目录的 `install.sh`。
 
 ---
@@ -11,7 +13,7 @@ Debian / Ubuntu 无头开发机：一条命令装好系统包、现代 CLI、语
 - **系统**：Ubuntu / Debian（读 `/etc/os-release`；其它发行版仅尽力而为）。
 - **权限**：以目标用户运行且具备 `sudo`，或以 root 运行（会装到 `SUDO_USER` 的主目录）。
 - **网络**：需要访问外网（mise 安装器、APT、GitHub / aqua）。
-- **架构**：`mise.lock` 锁了 `linux-x64` 和 `linux-arm64`。
+- **架构**：x86_64 / aarch64。
 
 ---
 
@@ -31,6 +33,15 @@ bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/script
 sudo bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/mise/install.sh)
 ```
 
+非交互、或已经想好装哪些 agent：
+
+```bash
+DEVBOX_AGENTS=claude,grok bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/mise/install.sh)
+# 或
+bash scripts/devbox-init/mise/install.sh --agents claude,codex
+bash scripts/devbox-init/mise/install.sh --no-agents
+```
+
 远程安装会把本仓库浅克隆到 `~/.local/src/my-devbox`。可用 `DEVBOX_REPO_URL` 覆盖仓库地址。
 
 ### 本仓库已在磁盘上
@@ -45,11 +56,11 @@ sudo bash scripts/devbox-init/mise/install.sh
 
 1. 用 APT 装 `ca-certificates` `curl` `git`（装 mise 之前的依赖）
 2. 按官方方式安装 [mise](https://mise.run) 到 `~/.local/bin/mise`
-3. 把本目录接到 `~/.config/mise/`：
-   - `config.toml` → `mise.toml`
-   - `mise.lock`、`dotfiles/`、`bootstrap-extras.sh`
-4. 执行 `mise bootstrap --yes --update --force-dotfiles`
-5. 配置 `en_US.UTF-8`
+3. 把本目录接到 `~/.config/mise/`（`config.toml` → `mise.toml`，以及 `dotfiles/`、`bootstrap-extras.sh`、`install-agents.sh`）
+4. 在终端里询问要装哪些 coding agents（直接回车 = 不装）。非交互且未设 `DEVBOX_AGENTS` / `--agents` 时跳过
+5. 执行 `mise bootstrap --yes --update --force-dotfiles`
+6. 按选择安装 coding agents
+7. 配置 `en_US.UTF-8`
 
 ### 装完立刻生效
 
@@ -65,7 +76,7 @@ source ~/.bashrc
 
 ## 3. 装了什么
 
-清单在 [`mise.toml`](./mise.toml)，精确版本在 [`mise.lock`](./mise.lock)。`install.sh` 把它们软链到 `~/.config/mise/`，所以工具在任意目录都进 PATH。
+清单只有 [`mise.toml`](./mise.toml)。`install.sh` 把它软链到 `~/.config/mise/config.toml`，所以工具在任意目录都进 PATH。`latest` / `lts` 每次安装或升级都按当时解析，不锁版本。
 
 ### 系统包（APT）
 
@@ -117,13 +128,56 @@ source ~/.bashrc
 
 ble.sh、ComicShannsMono Nerd Font、[herdr](https://herdr.dev)、一组 git 全局默认、以及只在缺失时创建的 `~/.config/shell/local.sh` 和 `functions.sh`。
 
+herdr 是 agent multiplexer，始终安装。具体 coding agent 见下一节，默认不装。
+
+### Coding agents（可选预设）
+
+mise **没有单独的 coding-agent 功能**。官方做法就是把它们当普通工具：[registry](https://mise.jdx.dev/registry.html) 里有 shorthand，写进 `[tools]`，`mise install`。Getting Started 也用 `npm:@anthropic-ai/claude-code` 当 backend 例子。
+
+仓库默认的 `mise.toml` **不声明任何 agent**。选中的项写到本机：
+
+`~/.config/mise/conf.d/coding-agents.toml`
+
+这是 mise 的 [conf.d](https://mise.jdx.dev/configuration.html#mise-toml) 片段，只对这台机器生效，不会改仓库清单。默认零安装。
+
+当前目录只收已经在用的这些。copilot / hermes 等先不加。
+
+| id | 命令 | 怎么装 |
+| --- | --- | --- |
+| `pi` | `pi` | mise registry `pi`（aqua:earendil-works/pi） |
+| `omp` | `omp` | mise registry `oh-my-pi` |
+| `claude` | `claude` | mise registry `claude` |
+| `codex` | `codex` | mise registry `codex` |
+| `kimi` | `kimi` | 官方脚本（不在 registry） |
+| `opencode` | `opencode` | mise registry `opencode` |
+| `cursor` | `cursor-agent` | 官方脚本（不在 registry） |
+| `antigravity-cli` | `agy` | mise registry `antigravity-cli` |
+| `grok` | `grok` | mise registry `grok` |
+
+```bash
+# 装机时指定
+bash install.sh --agents claude,grok
+DEVBOX_AGENTS=all bash install.sh
+bash install.sh --no-agents
+
+# 装好之后再补
+mise run agents
+bash ~/.config/mise/install-agents.sh --list
+bash ~/.config/mise/install-agents.sh --agents claude,codex
+```
+
+已装的会跳过（`--force` 才重装）。登录和 API key 留给各 CLI。`grok` / `cursor` 都可能再提供一个 `agent` 入口，本目录用 `grok` / `cursor-agent` 判断。
+
+选中记录在 `~/.config/mise/coding-agents.selected`。
+
 ### 工作站任务
 
 | 命令 | 作用 |
 | --- | --- |
-| `mise run update` | 按 toml 范围升级已声明工具，并刷新 lock |
+| `mise run update` | 按 toml 把已装工具升到当前最新 |
 | `mise run doctor` | `mise doctor` + bootstrap 缺项 |
-| `mise run sync` | `git pull --ff-only` 配置仓库，再完整 bootstrap |
+| `mise run sync` | 把配置仓库对齐到 origin，再完整 bootstrap |
+| `mise run agents` | 选择并安装 coding agent 预设 |
 
 ---
 
@@ -176,73 +230,33 @@ mise run doctor
 | 想做的事 | 做法 |
 | --- | --- |
 | 少装一门语言 | 注释掉 `[tools]` 对应行，然后 `mise bootstrap --yes --only tools` |
-| 加一个 CLI | 加一行例如 `tokei = "latest"`，再 `--only tools`，然后 `mise lock --platform linux-x64,linux-arm64` 并提交 lock |
+| 加一个 CLI | 在 `[tools]` 加一行例如 `tokei = "latest"`，提交，机器上 `mise run sync` 或重跑 `install.sh` |
 | 只刷新 dotfiles | `mise bootstrap --yes --only dotfiles --force-dotfiles` |
 | 只跑 ble.sh / 字体 / git 默认 | `mise bootstrap --yes --only task` |
+| 补装 coding agents | `mise run agents` 或 `bash ~/.config/mise/install-agents.sh --agents …` |
 
 ---
 
-## 5. 怎么升级
+## 5. 怎么更新
 
-锁住之后，`mise.toml` 里的 `latest` / `lts` **不会自己往前走**。装机和 `mise install` 都按 `mise.lock`。
+两件事分开：
 
-### 这台机器上的工具
+| 你想做的 | 命令 |
+| --- | --- |
+| 仓库里的 `mise.toml` / dotfiles 变了 | 再跑一遍 `install.sh`，或 `mise run sync` |
+| 已装工具升到当前最新 | `mise run update` |
 
-```bash
-mise run update
-```
+远程安装的机器，配置在 `~/.local/src/my-devbox`。`install.sh` 和 `mise run sync` 都会把它 `reset --hard` 到 origin，然后 bootstrap。不要在这份克隆里手改。
 
-等于 `mise upgrade`（按范围解析、改 lock、装上新版本）再补齐缺的 `[tools]`。
+清单要改就改 GitHub 上的 [`mise.toml`](./mise.toml)，提交后各机器同步。
 
-只升某一个：
-
-```bash
-mise upgrade node uv
-```
-
-### 配置仓库也更新了（推荐的多机流程）
-
-1. 一台机器 `mise run update`，或在能跑 mise 的地方刷新 lock
-2. 看 `git diff scripts/devbox-init/mise/mise.lock`
-3. 提交
-4. 其它已装机器：
-
-```bash
-mise run sync
-```
-
-`sync` 会定位 `~/.config/mise/config.toml` 指向的仓库、`git pull --ff-only`，再完整 bootstrap（含 `--force-dotfiles`）。
-
-不要两台机器各自 `mise upgrade` 却不提交 lock，否则又会漂。
-
-### 只改 lock、不在本机安装
-
-适合在 macOS 上维护这份 Linux lock：
-
-```bash
-cd scripts/devbox-init/mise
-mise lock --bump --platform linux-x64,linux-arm64
-```
-
-不改 `mise.toml`，不安装。提交后服务器上 `mise run sync` 或 `mise install`。
-
-### 升级 mise 自己
+mise 自己：
 
 ```bash
 mise self-update
 ```
 
-本配置要求 mise ≥ `2026.7.0`（`min_version`）。包管理器装的 mise 往往偏旧，官方安装器支持 `self-update`。
-
-### 三种升级命令
-
-| 命令 | 改 toml | 改 lock | 安装 |
-| --- | --- | --- | --- |
-| `mise run update` / `mise upgrade` | 否 | 是 | 是 |
-| `mise lock --bump --platform linux-x64,linux-arm64` | 否 | 是 | 否 |
-| `mise upgrade --bump` | 会改前缀 pin | 是 | 是 |
-
-这份清单几乎全是 `latest` / `lts`，日常用前两种，不要用 `--bump` 去改 toml。
+本配置要求 mise ≥ `2026.7.0`。包管理器装的 mise 往往偏旧，官方安装器支持 `self-update`。
 
 ---
 
@@ -254,3 +268,4 @@ mise self-update
 - `alias cd='z'` 改变交互习惯。
 - 写入一组 git 全局默认（editor、pull、diff、delta pager）。
 - 启用 `unattended-upgrades` 与 `en_US.UTF-8`。
+- 选中的 coding agents 多数写进本机 `~/.config/mise/conf.d/coding-agents.toml`；kimi / cursor 跑官方安装器。本脚本不替它们登录或写 API key。

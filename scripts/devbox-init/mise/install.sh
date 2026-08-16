@@ -3,9 +3,11 @@
 # devbox-init/mise — 用 mise 初始化 Debian/Ubuntu 无头开发机
 #
 #   装 mise → 把本目录接到 ~/.config/mise → mise bootstrap
+#   coding agents 默认不装，装机时选择或之后 `mise run agents`
 #
 #   运行:   bash install.sh
 #           sudo bash install.sh
+#           bash install.sh --agents claude,grok
 #           bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/mise/install.sh)
 # =============================================================================
 
@@ -27,21 +29,53 @@ usage() {
 用法:
   bash install.sh
   sudo bash install.sh
+  bash install.sh --agents claude,grok
+  bash install.sh --no-agents
 
 远程一键:
   bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/mise/install.sh)
+  DEVBOX_AGENTS=claude,grok bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/devbox-init/mise/install.sh)
 
 环境变量:
   DEVBOX_REPO_URL     覆盖 git 仓库地址（远程安装时克隆用）
   MISE_INSTALL_URL    覆盖 mise 安装器地址，默认 https://mise.run
+  DEVBOX_AGENTS       要装的 coding agent id，逗号分隔；all=全部；none=不装
+                      未设置且在终端里运行时，会在 bootstrap 之前询问
+
+参数:
+  --agents IDS        同 DEVBOX_AGENTS（覆盖环境变量）
+  --no-agents         明确不装 coding agents
 EOF
 }
+
+AGENTS_SPEC=""
+AGENTS_SPEC_SET=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
       usage
       exit 0
+      ;;
+    --no-agents)
+      AGENTS_SPEC="none"
+      AGENTS_SPEC_SET=1
+      shift
+      ;;
+    --agents)
+      if [ "$#" -lt 2 ]; then
+        printf '\033[1;31m✘ --agents 需要一个参数\033[0m\n' >&2
+        usage >&2
+        exit 2
+      fi
+      AGENTS_SPEC="$2"
+      AGENTS_SPEC_SET=1
+      shift 2
+      ;;
+    --agents=*)
+      AGENTS_SPEC="${1#*=}"
+      AGENTS_SPEC_SET=1
+      shift
       ;;
     *)
       printf '\033[1;31m✘ 未知参数: %s\033[0m\n' "$1" >&2
@@ -50,6 +84,11 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+if [ "$AGENTS_SPEC_SET" = 0 ] && [ -n "${DEVBOX_AGENTS+x}" ]; then
+  AGENTS_SPEC="$DEVBOX_AGENTS"
+  AGENTS_SPEC_SET=1
+fi
 
 # ── 环境检测 ────────────────────────────────────────────────────────────────
 
@@ -81,11 +120,29 @@ fi
 printf '\033[1;37m\n'
 printf '  ╔════════════════════════════════════════════════════╗\n'
 printf '  ║  %-50s  ║\n' "🛠️  devbox-init / mise"
-printf '  ║  %-50s  ║\n' "   系统包 · CLI · 语言工具链 · dotfiles"
+printf '  ║  %-50s  ║\n' "   系统包 · CLI · 语言 · 可选 coding agents"
 printf '  ╚════════════════════════════════════════════════════╝\n'
 printf '\033[0m'
 
 log "📋 目标用户: \033[1m$DISPATCHER\033[0m (主目录: $DISPATCHER_HOME)"
+
+# 旧官方安装器写进 login shell 的 source 行；目录已删时每次 bash -lc 都会报错。
+# 不用 -l：否则清自己的时候还会再 source 一遍坏掉的 .profile。
+if [ "$DISPATCHER" = "$(id -un)" ]; then
+  CLEAN_SH="bash -c"
+else
+  CLEAN_SH="sudo -H -u $DISPATCHER bash -c"
+fi
+$CLEAN_SH 'for f in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc"; do
+  [ -f "$f" ] || continue
+  tmp=$(mktemp)
+  grep -v "/.atuin/bin/env" "$f" | grep -v "/.deno/env" > "$tmp"
+  if ! cmp -s "$f" "$tmp"; then
+    cat "$tmp" > "$f"
+    printf "cleaned %s\n" "$f"
+  fi
+  rm -f "$tmp"
+done'
 
 # ── 鸡生蛋：curl / git / ca-certificates ────────────────────────────────────
 
@@ -124,11 +181,21 @@ if [ -z "$SRC" ]; then
   step "从 $REPO_URL 获取配置 ..."
   $AS_USER "mkdir -p \"\$HOME/.local/src\""
   if [ -d "$CLONE_DIR/.git" ]; then
-    if $AS_USER "git -C \"\$HOME/.local/src/my-devbox\" pull --ff-only"; then
-      ok "已更新 $CLONE_DIR"
-    else
-      warn "git pull --ff-only 失败，继续使用已有副本"
-    fi
+    # 这份浅克隆归安装器管。mise 以前写 lock 会把工作区弄脏，
+    # pull --ff-only 失败后再用旧副本，就会继续装仓库里已经删掉的包。
+    $AS_USER "set -euo pipefail
+      dir=\"\$HOME/.local/src/my-devbox\"
+      git -C \"\$dir\" fetch --depth 1 origin
+      branch=\$(git -C \"\$dir\" rev-parse --abbrev-ref HEAD)
+      if [ \"\$branch\" = HEAD ]; then
+        branch=main
+      fi
+      if git -C \"\$dir\" show-ref --verify --quiet \"refs/remotes/origin/\$branch\"; then
+        git -C \"\$dir\" reset --hard \"origin/\$branch\"
+      else
+        git -C \"\$dir\" reset --hard origin/main
+      fi"
+    ok "已对齐 $CLONE_DIR 到 origin"
   else
     $AS_USER "git clone --depth 1 $(printf '%q' "$REPO_URL") \"\$HOME/.local/src/my-devbox\""
     ok "已克隆到 $CLONE_DIR"
@@ -137,16 +204,52 @@ if [ -z "$SRC" ]; then
   [ -f "$SRC/mise.toml" ] || { printf '  \033[1;31m✘ 克隆结果里找不到 %s/mise.toml\033[0m\n' "$SRC" >&2; exit 1; }
 fi
 
+# ── 选择 coding agents（在漫长的 bootstrap 之前问，默认不装） ───────────────
+
+AGENT_SCRIPT="$SRC/install-agents.sh"
+if [ ! -f "$AGENT_SCRIPT" ]; then
+  warn "找不到 $AGENT_SCRIPT，跳过 coding agents"
+  AGENTS_SPEC=""
+  AGENTS_SPEC_SET=1
+elif [ "$AGENTS_SPEC_SET" = 0 ]; then
+  if [ -t 0 ] && [ -t 1 ]; then
+    log "🤖 选择 coding agents"
+    AGENTS_SPEC="$(bash "$AGENT_SCRIPT" --prompt)"
+    AGENTS_SPEC_SET=1
+  else
+    step "非交互且未指定 --agents / DEVBOX_AGENTS，跳过 coding agents"
+    AGENTS_SPEC=""
+    AGENTS_SPEC_SET=1
+  fi
+else
+  AGENTS_SPEC="$(bash "$AGENT_SCRIPT" --prompt --agents "$AGENTS_SPEC")"
+fi
+if [ -n "${AGENTS_SPEC:-}" ]; then
+  ok "将安装: $AGENTS_SPEC"
+else
+  ok "不安装 coding agents"
+fi
+
 # ── 接到全局 config（否则工具只在仓库目录里生效） ──────────────────────────
 
 log "🔗 连接到 ~/.config/mise"
-$AS_USER "mkdir -p \"\$HOME/.config/mise\" \"\$HOME/.local/bin\" \"\$HOME/.local/src\" \"\$HOME/.local/share/fonts\" \"\$HOME/.config\" \"\$HOME/.cache\"
-  ln -sfn $(printf '%q' "$SRC/mise.toml") \"\$HOME/.config/mise/config.toml\"
-  ln -sfn $(printf '%q' "$SRC/dotfiles") \"\$HOME/.config/mise/dotfiles\"
-  ln -sfn $(printf '%q' "$SRC/bootstrap-extras.sh") \"\$HOME/.config/mise/bootstrap-extras.sh\"
-  if [ -f $(printf '%q' "$SRC/mise.lock") ]; then
-    ln -sfn $(printf '%q' "$SRC/mise.lock") \"\$HOME/.config/mise/mise.lock\"
-  fi"
+$AS_USER "set -euo pipefail
+  mkdir -p \"\$HOME/.config/mise\" \"\$HOME/.local/bin\" \"\$HOME/.local/src\" \"\$HOME/.local/share/fonts\" \"\$HOME/.config\" \"\$HOME/.cache\"
+  relink() {
+    src=\$1 dest=\$2
+    # ln -sfn 无法替换同名真目录，会在里面再链一层。
+    if [ -L \"\$dest\" ] || [ ! -e \"\$dest\" ]; then
+      ln -sfn \"\$src\" \"\$dest\"
+    else
+      rm -rf \"\$dest\"
+      ln -sfn \"\$src\" \"\$dest\"
+    fi
+  }
+  relink $(printf '%q' "$SRC/mise.toml") \"\$HOME/.config/mise/config.toml\"
+  relink $(printf '%q' "$SRC/dotfiles") \"\$HOME/.config/mise/dotfiles\"
+  relink $(printf '%q' "$SRC/bootstrap-extras.sh") \"\$HOME/.config/mise/bootstrap-extras.sh\"
+  relink $(printf '%q' "$SRC/install-agents.sh") \"\$HOME/.config/mise/install-agents.sh\"
+  rm -f \"\$HOME/.config/mise/mise.lock\""
 ok "$DISPATCHER_HOME/.config/mise/config.toml → $SRC/mise.toml"
 
 # ── mise bootstrap ──────────────────────────────────────────────────────────
@@ -157,6 +260,17 @@ $AS_USER "export PATH=\"\$HOME/.local/bin:\$PATH\"
   mise trust \"\$HOME/.config/mise/config.toml\" || true
   mise -C \"\$HOME\" bootstrap --yes --update --force-dotfiles"
 ok "mise bootstrap 完成"
+
+# ── coding agents（需要 bootstrap 之后的 node / uv） ────────────────────────
+
+if [ -n "${AGENTS_SPEC:-}" ] && [ -f "$AGENT_SCRIPT" ]; then
+  log "🤖 安装 coding agents: $AGENTS_SPEC"
+  if [ "$DISPATCHER" = "$(id -un)" ]; then
+    bash "$AGENT_SCRIPT" --agents "$AGENTS_SPEC" || warn "部分 coding agents 安装失败"
+  else
+    sudo -H -u "$DISPATCHER" bash "$AGENT_SCRIPT" --agents "$AGENTS_SPEC" || warn "部分 coding agents 安装失败"
+  fi
+fi
 
 # ── locale（需要 root；packages 阶段之后 locales 已在） ─────────────────────
 
@@ -183,10 +297,18 @@ printf '\033[0m\n'
 
 printf '  目标用户: %s\n' "$DISPATCHER"
 printf '  配置文件: %s/.config/mise/config.toml\n' "$DISPATCHER_HOME"
-printf '  源目录:   %s\n\n' "$SRC"
+printf '  源目录:   %s\n' "$SRC"
+if [ -n "${AGENTS_SPEC:-}" ]; then
+  printf '  agents:   %s\n\n' "$AGENTS_SPEC"
+else
+  printf '  agents:   （未安装）\n\n'
+fi
 printf '  让 shell 立即生效:\n'
 printf '     \033[1msource ~/.bashrc\033[0m\n\n'
 printf '  增删工具: 编辑 %s/mise.toml 的 [tools]，然后:\n' "$SRC"
 printf '     \033[1mmise bootstrap --yes --only tools\033[0m\n\n'
+printf '  以后再装 / 补装 coding agents:\n'
+printf '     \033[1mmise run agents\033[0m\n'
+printf '     \033[1mbash ~/.config/mise/install-agents.sh --agents claude,grok\033[0m\n\n'
 printf '  个人 alias / 环境变量（不会被覆盖）:\n'
 printf '     ~/.config/shell/local.sh\n'

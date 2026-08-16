@@ -13,7 +13,12 @@ export XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
 if [[ -z ${TERM:-} || ${TERM:-} == dumb ]]; then
   export TERM=xterm-256color
 fi
-export PATH="$HOME/.local/bin:$PATH"
+PATH="$HOME/.local/bin:$PATH"
+# 部分 coding agent 官方安装器不用 ~/.local/bin；mise 装的走 activate
+[ -d "$HOME/.grok/bin" ] && PATH="$PATH:$HOME/.grok/bin"
+[ -d "$HOME/.opencode/bin" ] && PATH="$PATH:$HOME/.opencode/bin"
+[ -d "$HOME/.kimi-code/bin" ] && PATH="$PATH:$HOME/.kimi-code/bin"
+export PATH
 
 # 必须在 command -v fzf/direnv/zoxide 等之前：mise bootstrap 会把
 # source ~/.bashrc.generated 写在 ~/.bashrc 的 activate 块前面。

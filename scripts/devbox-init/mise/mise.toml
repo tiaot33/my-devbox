@@ -10,9 +10,9 @@
 
 min_version = { hard = "2026.7.0" }
 
-# 维持已有 mise.lock；升级工具后 lock 会跟着更新。
+# 不锁版本。清单里的 latest / lts 每次 bootstrap / upgrade 都按当时解析。
 [settings]
-lockfile = true
+lockfile = false
 
 # ── 系统包：编译器、locale、基础 Unix 工具。版本化 CLI 不放这里。 ───────────
 
@@ -148,8 +148,13 @@ deno = "latest"
 description = "ble.sh、Nerd Font、herdr、git 默认、用户 shell 占位文件"
 run = 'bash "$HOME/.config/mise/bootstrap-extras.sh"'
 
+[tasks.agents]
+description = "选择并安装 coding agent 预设（默认不装）"
+dir = "{{cwd}}"
+run = 'bash "$HOME/.config/mise/install-agents.sh"'
+
 [tasks.update]
-description = "按 mise.toml 范围升级已声明工具，并刷新 lock"
+description = "把已声明工具升到 mise.toml 范围里的最新版"
 dir = "{{cwd}}"
 run = '''
 #!/usr/bin/env bash
@@ -171,7 +176,7 @@ exit "$rc"
 '''
 
 [tasks.sync]
-description = "拉取配置仓库并重新 bootstrap"
+description = "把配置仓库对齐到 origin，再完整 bootstrap"
 dir = "{{cwd}}"
 run = '''
 #!/usr/bin/env bash
@@ -184,6 +189,20 @@ fi
 real="$(readlink -f "$cfg")"
 dir="$(dirname "$real")"
 root="$(git -C "$dir" rev-parse --show-toplevel)"
-git -C "$root" pull --ff-only
+managed="${HOME}/.local/src/my-devbox"
+if [ "$root" = "$managed" ]; then
+  git -C "$root" fetch --depth 1 origin
+  branch="$(git -C "$root" rev-parse --abbrev-ref HEAD)"
+  if [ "$branch" = HEAD ]; then
+    branch=main
+  fi
+  if git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+    git -C "$root" reset --hard "origin/$branch"
+  else
+    git -C "$root" reset --hard origin/main
+  fi
+else
+  git -C "$root" pull --ff-only
+fi
 mise bootstrap --yes --update --force-dotfiles
 '''
