@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Idempotent extras that mise cannot declare: ble.sh, nerd font, git defaults,
-# user-owned shell stubs, herdr.
+# user-owned shell stubs, herdr, try.
 set -uo pipefail
 
 log()  { printf '\n\033[1;34m▶ %s\033[0m\n' "$*"; }
@@ -98,6 +98,40 @@ else
     warn "herdr 安装脚本下载失败"
   fi
   rm -f "$tmp"
+fi
+
+# ── try (https://github.com/tobi/try) ───────────────────────────────────────
+# 单仓库 Ruby 脚本（依赖 lib/），不是 mise 能声明的 CLI。系统 ruby 跑即可。
+
+log "try"
+try_src="$HOME/.local/src/try"
+try_bin="$HOME/.local/bin/try"
+try_ok=0
+if command -v try >/dev/null 2>&1 || [ -x "$try_bin" ]; then
+  try_ok=1
+  ok "try 已安装"
+fi
+if [ "$try_ok" = "0" ]; then
+  if ! command -v ruby >/dev/null 2>&1; then
+    warn "未找到 ruby，跳过 try（需要 APT 包 ruby，MRI ≥ 3.2）"
+  elif ! ruby -e 'Data.define(:x)' >/dev/null 2>&1; then
+    warn "ruby $(ruby -e 'print RUBY_VERSION') 过旧，跳过 try（需要 ≥ 3.2）"
+  else
+    step "clone tobi/try ..."
+    rm -rf "$try_src"
+    if git clone --depth 1 https://github.com/tobi/try.git "$try_src" &&
+       [ -s "$try_src/try.rb" ]; then
+      cat > "$try_bin" <<EOF
+#!/usr/bin/env bash
+exec ruby "$try_src/try.rb" "\$@"
+EOF
+      chmod +x "$try_bin"
+      ok "try 已安装"
+    else
+      warn "try 安装失败"
+      rm -f "$try_bin"
+    fi
+  fi
 fi
 
 # ── Git 全局默认 ────────────────────────────────────────────────────────────

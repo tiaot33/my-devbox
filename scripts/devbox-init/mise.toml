@@ -70,6 +70,8 @@ kimi = "npm:@moonshot-ai/kimi-code"
 "apt:liblzma-dev" = "latest"
 "apt:unattended-upgrades" = "latest"
 "apt:ncdu" = "latest"
+# try (https://github.com/tobi/try) 需要 MRI ≥ 3.2；系统包约 30MB，远小于 mise 的 ruby 工具链。
+"apt:ruby" = "latest"
 
 [bootstrap.files."/etc/apt/apt.conf.d/20auto-upgrades"]
 content = '''
@@ -151,7 +153,7 @@ deno = "latest"
 "aqua:air-verse/air" = "latest"
 
 [tasks.bootstrap]
-description = "ble.sh、Nerd Font、herdr、git 默认、用户 shell 占位文件"
+description = "ble.sh、Nerd Font、herdr、try、git 默认、用户 shell 占位文件"
 run = 'bash "$HOME/.config/mise/bootstrap-extras.sh"'
 
 [tasks.update]

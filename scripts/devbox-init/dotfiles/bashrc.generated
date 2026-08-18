@@ -146,6 +146,12 @@ if command -v zoxide >/dev/null 2>&1; then
   alias cd='z'
 fi
 
+# try — 给每次实验一个带日期的目录（https://github.com/tobi/try）
+# 必须是 shell 函数才能 cd；默认目录 ~/src/tries，可用 TRY_PATH 改。
+if command -v try >/dev/null 2>&1; then
+  eval "$(try init)"
+fi
+
 # Atuin — shell 历史搜索
 if command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init bash --disable-up-arrow)"

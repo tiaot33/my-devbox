@@ -90,6 +90,7 @@ source ~/.bashrc
 | 原生绑定头文件 | `libssl-dev` `zlib1g-dev` `libffi-dev` `libbz2-dev` `libreadline-dev` `libsqlite3-dev` `liblzma-dev` |
 | 远程排障 | `iproute2` `dnsutils` `openssh-client` `rsync` `lsof` `psmisc` `strace` `iputils-ping` `mtr-tiny` |
 | 维护 | `unattended-upgrades` `ncdu` |
+| 运行时依赖 | `ruby`（给 [try](https://github.com/tobi/try)；系统包约 30MB，不走 mise 的 ruby 工具链） |
 
 另外会写入 `/etc/apt/apt.conf.d/20auto-upgrades`，打开无人值守安全更新。
 
@@ -125,9 +126,11 @@ source ~/.bashrc
 
 ### 声明式装不下的（`mise run bootstrap` / extras）
 
-ble.sh、ComicShannsMono Nerd Font、[herdr](https://herdr.dev)、一组 git 全局默认、以及只在缺失时创建的 `~/.config/shell/local.sh` 和 `functions.sh`。
+ble.sh、ComicShannsMono Nerd Font、[herdr](https://herdr.dev)、[try](https://github.com/tobi/try)、一组 git 全局默认、以及只在缺失时创建的 `~/.config/shell/local.sh` 和 `functions.sh`。
 
 herdr 是 agent multiplexer，始终安装。具体 coding agent 默认不装，见下一节。
+
+`try` 用系统 `ruby` 跑仓库脚本（`~/.local/src/try` + `~/.local/bin/try`），交互式选择后 `cd` 到 `~/src/tries` 下带日期的实验目录。MRI 低于 3.2（例如 Ubuntu 22.04 的 3.0）会跳过。换目录：`export TRY_PATH=...`。
 
 ### Coding agents（可选）
 
@@ -177,6 +180,7 @@ mise 没有单独的 coding-agent 功能，就是普通工具。装机时勾选�
 | 你打的 | 实际是 |
 | --- | --- |
 | `cd foo` 或 `z foo` | [zoxide](https://github.com/ajeetdsouza/zoxide) 模糊跳转（`alias cd='z'`） |
+| `try` / `try redis` | [try](https://github.com/tobi/try) 模糊跳到或新建 `~/src/tries/YYYY-MM-DD-…` |
 | `ls` / `ll` / `l` | `eza` |
 | `vim` / `vi` | `nvim` |
 | Tab 补全 | carapace（多数 CLI）+ `mise completion` |
