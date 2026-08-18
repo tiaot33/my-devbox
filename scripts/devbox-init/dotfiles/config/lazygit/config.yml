@@ -32,9 +32,10 @@ gui:
       - cyan
 
 git:
-  paging:
-    colorArg: always
-    useConfig: false
+  # 新版本用 diffRenderers，不再用 git.paging。
+  # 无 command 的 rawGit = 用 git 自带彩色 diff（等同旧 paging.useConfig=false）。
+  diffRenderers:
+    - type: rawGit
   commit:
     signOff: false
   log:

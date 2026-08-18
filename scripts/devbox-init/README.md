@@ -100,8 +100,9 @@ source ~/.bashrc
 | --- | --- |
 | 文件 / 搜索 | `eza` `bat` `fd` `ripgrep` `fzf` `tree`（APT） |
 | 系统观察 | `btop` `dust` `duf` `ncdu`（APT） |
-| Git | `gh` `lazygit` `delta` `hunk` |
+| Git | `gh` `lazygit` `delta` `hunk` `gibo` |
 | HTTP / 数据 | `curl`（APT） `xh` `jq` `yq` |
+| 下载 | `yt-dlp` |
 | 编辑 | `neovim`（`vim`/`vi` 指向它） |
 | 终端 | `starship` `zoxide` `atuin` `tmux`（APT） |
 | 环境 | `direnv` `mise` |
@@ -188,6 +189,7 @@ mise 没有单独的 coding-agent 功能，就是普通工具。装机时勾选�
 | `git diff` | delta 当 pager |
 | `hunk diff` | 交互审阅工作区（含未跟踪文件） |
 | `lazygit` | Git TUI |
+| `gibo dump Node >> .gitignore` | 从 [github/gitignore](https://github.com/github/gitignore) 拉模板 |
 | `mise run …` | 工作站任务 |
 
 个人 alias、环境变量、函数放这里，**bootstrap 不会覆盖**：
