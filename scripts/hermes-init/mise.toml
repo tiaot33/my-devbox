@@ -1,0 +1,95 @@
+# hermes-init. install.sh 把它链到 ~/.config/mise/conf.d/00-hermes.toml。
+#
+# 不声明 [tools]。这里要的都是 latest 主机工具，不走 mise 多版本 / shim。
+# 全部由 `mise bootstrap` 安装：APT 包、系统文件、dotfiles，声明不了的放 extras。
+#
+# 旁边的 hermes-init.sh 仍可单独跑，两套入口并行。
+
+min_version = { hard = "2026.7.0" }
+
+[settings]
+lockfile = false
+
+# ── APT：和 hermes-init.sh 同一份维护工具清单 ───────────────────────────────
+
+[bootstrap.packages]
+"apt:ca-certificates" = "latest"
+"apt:curl" = "latest"
+"apt:wget" = "latest"
+"apt:gnupg" = "latest"
+"apt:locales" = "latest"
+"apt:tzdata" = "latest"
+"apt:bash-completion" = "latest"
+"apt:man-db" = "latest"
+"apt:build-essential" = "latest"
+"apt:pkg-config" = "latest"
+"apt:make" = "latest"
+"apt:gawk" = "latest"
+"apt:git" = "latest"
+"apt:openssh-client" = "latest"
+"apt:less" = "latest"
+"apt:tree" = "latest"
+"apt:vim" = "latest"
+"apt:nano" = "latest"
+"apt:tmux" = "latest"
+"apt:htop" = "latest"
+"apt:jq" = "latest"
+"apt:unzip" = "latest"
+"apt:zip" = "latest"
+"apt:tar" = "latest"
+"apt:xz-utils" = "latest"
+"apt:zstd" = "latest"
+"apt:gzip" = "latest"
+"apt:file" = "latest"
+"apt:iproute2" = "latest"
+"apt:dnsutils" = "latest"
+"apt:ripgrep" = "latest"
+"apt:fzf" = "latest"
+"apt:shellcheck" = "latest"
+"apt:shfmt" = "latest"
+"apt:bat" = "latest"
+"apt:fd-find" = "latest"
+"apt:btop" = "latest"
+
+# ── 系统文件（相对本 config 所在目录解析 source） ───────────────────────────
+
+[bootstrap.files."/etc/profile.d/hermes-shell.sh"]
+source = "dotfiles/hermes-shell.sh"
+owner = "root"
+group = "root"
+mode = "0644"
+
+[dotfiles]
+"~/.inputrc" = { source = "dotfiles/inputrc", mode = "copy" }
+"~/.vimrc" = { source = "dotfiles/vimrc", mode = "copy" }
+"~/.tmux.conf" = { source = "dotfiles/tmux.conf", mode = "copy" }
+"~/.blerc" = { source = "dotfiles/blerc", mode = "copy" }
+"~/.bashrc/hermes-init" = { line = '[ -r /etc/profile.d/hermes-shell.sh ] && . /etc/profile.d/hermes-shell.sh' }
+
+# ── 声明不了的：官方源 / GitHub Release / 源码安装 / locale ─────────────────
+
+[tasks.bootstrap]
+description = "gh、uv、starship、lazygit、lazyssh、ble.sh、locale"
+run = 'bash "$HOME/.config/mise/bootstrap-extras.sh"'
+
+[tasks.doctor]
+description = "检查 bootstrap 缺项"
+dir = "{{cwd}}"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+rc=0
+mise doctor || rc=1
+mise bootstrap status --missing || rc=1
+exit "$rc"
+'''
+
+[tasks.update]
+description = "升级已声明 APT 包，再重跑 extras"
+dir = "{{cwd}}"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+mise bootstrap packages upgrade --yes
+mise bootstrap --yes --only task
+'''

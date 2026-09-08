@@ -2,14 +2,22 @@
 
 Debian / Ubuntu 上的 Hermes 初始化脚本集合。
 
-目录中有两份脚本：
+外部环境有两条并行入口，装的东西一样，选一条即可：
+
+| 入口 | 怎么管 | 适合 |
+| --- | --- | --- |
+| `install.sh` | 先装 [mise](https://mise.jdx.dev/)，再 `mise bootstrap` 声明式安装 | 以后用 `mise bootstrap` / `mise run doctor` 维护 |
+| `hermes-init.sh` | 原版单体脚本，不装 mise | `wget \| bash` 一次跑完 |
+
+两条路径都不声明 `[tools]`，不装多版本运行时。APT 包、dotfiles、`/etc/profile.d/hermes-shell.sh` 由 bootstrap 声明；gh / uv / starship / lazygit / lazyssh / ble.sh / locale 声明不了，走 `bootstrap-extras.sh`（和 `hermes-init.sh` 同一套安装逻辑）。
 
 | 脚本 | 职责 |
 | --- | --- |
-| `hermes-init.sh` | 安装基础维护工具、GitHub CLI、uv、Starship、lazygit、lazyssh、ble.sh，并配置 root 交互 shell |
+| `install.sh` | 装 mise，接到 `~/.config/mise/conf.d/00-hermes.toml`，执行 `mise bootstrap` |
+| `hermes-init.sh` | 原版：安装基础维护工具、GitHub CLI、uv、Starship、lazygit、lazyssh、ble.sh，并配置 root 交互 shell |
 | `hermes-agent-install.sh` | 安装 Hermes 必需依赖，运行官方安装器，配置 API Server、shell 补全和 `hermes-setup` |
 
-两份脚本都要求以 root 身份运行，可以按需单独执行。
+`install.sh` / `hermes-init.sh` / `hermes-agent-install.sh` 都要求以 root 身份运行，可以按需单独执行。Hermes Agent 安装仍只走 `hermes-agent-install.sh`。
 
 ## 适用环境
 
@@ -17,21 +25,41 @@ Debian / Ubuntu 上的 Hermes 初始化脚本集合。
 - 推荐系统：Ubuntu 26 / Debian 13。
 - 运行权限：root。
 - 网络要求：
-  - 两份脚本都需要访问 APT 源。
-  - `hermes-init.sh` 还需要访问 GitHub CLI APT 源、GitHub Release、uv 安装脚本和 Starship 安装脚本。
+  - 安装脚本都需要访问 APT 源。
+  - `install.sh` / `hermes-init.sh` 还需要访问 GitHub CLI APT 源、GitHub Release、uv 安装脚本和 Starship 安装脚本。`install.sh` 另外需要访问 mise 官方安装器。
   - `hermes-agent-install.sh` 还需要访问 Hermes 官方安装脚本，以及官方安装器内部使用的外部资源。
 
 非 Ubuntu 26 / Debian 13 系统不会被强制拦截，脚本只会给出提示。其它 Debian / Ubuntu 版本通常可运行，但结果取决于系统包名和外部安装器兼容性。
 
 ## 使用方法
 
-安装外部维护环境：
+### mise bootstrap（推荐，可重复收敛）
+
+```bash
+bash install.sh
+```
+
+远程：
+
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/hermes-init/install.sh)
+```
+
+装完之后日常：
+
+```bash
+mise bootstrap --yes --update --force-dotfiles
+mise run doctor
+mise run update
+```
+
+### 原版脚本（不装 mise）
 
 ```bash
 bash hermes-init.sh
 ```
 
-远程安装外部维护环境：
+远程：
 
 ```bash
 bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/scripts/hermes-init/hermes-init.sh)
@@ -52,15 +80,30 @@ bash <(wget -qO- https://raw.githubusercontent.com/tiaot33/my-devbox/main/script
 查看帮助：
 
 ```bash
+bash install.sh --help
 bash hermes-init.sh --help
 bash hermes-agent-install.sh --help
 ```
 
 `hermes-agent-install.sh` 会在运行 Hermes 官方安装器前二次确认。建议先审阅本脚本和官方安装器，再继续安装。
 
+## mise 路径装完之后
+
+`install.sh` 会把本目录接到 root 的全局 mise 配置：
+
+| 路径 | 指向 |
+| --- | --- |
+| `~/.config/mise/conf.d/00-hermes.toml` | 仓库 [`mise.toml`](./mise.toml) |
+| `~/.config/mise/conf.d/dotfiles` | 仓库 [`dotfiles/`](./dotfiles) |
+| `~/.config/mise/bootstrap-extras.sh` | 仓库 [`bootstrap-extras.sh`](./bootstrap-extras.sh) |
+
+`mise.toml` 没有 `[tools]`，也不会 `mise activate`。PATH 仍由 `/etc/profile.d/hermes-shell.sh` 提供 `/root/.local/bin` 和 `/usr/local/bin`，mise 本身只在 `~/.local/bin/mise`。
+
+改清单：编辑仓库里的 `mise.toml` / `dotfiles/` / `bootstrap-extras.sh`，机器上再跑 `mise bootstrap --yes --update --force-dotfiles`。不要和 `hermes-init.sh` 混着当两套源；选一条入口即可。
+
 ## hermes-init.sh 安装内容
 
-`hermes-init.sh` 面向“偶尔需要人工登录维护”的 root 环境，只做低侵入增强，不安装 Hermes，也不修改 `/root/.hermes/.env`。
+`install.sh` 和 `hermes-init.sh` 面向“偶尔需要人工登录维护”的 root 环境，只做低侵入增强，不安装 Hermes，也不修改 `/root/.hermes/.env`。装的内容相同。
 
 APT 包清单：
 
@@ -257,7 +300,17 @@ Python、Node.js、uv、ffmpeg、Playwright / Chromium 相关内容由 Hermes �
 
 ## 生成或修改的文件
 
-`hermes-init.sh` 可能生成或修改：
+`install.sh` 额外生成或修改：
+
+| 文件 | 作用 |
+| --- | --- |
+| `~/.local/bin/mise` | mise 命令 |
+| `~/.config/mise/conf.d/00-hermes.toml` | 仓库 `mise.toml` 软链 |
+| `~/.config/mise/conf.d/dotfiles` | 仓库 `dotfiles/` 软链 |
+| `~/.config/mise/bootstrap-extras.sh` | extras 软链 |
+| `~/.config/mise/config.toml` | 空的本机全局配置（仅在缺失时创建） |
+
+`hermes-init.sh` 和 `install.sh`（经 bootstrap）都可能生成或修改：
 
 | 文件 | 作用 |
 | --- | --- |
