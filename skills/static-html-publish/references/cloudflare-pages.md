@@ -11,10 +11,12 @@ SKILL 选型表指向 CF 时：长期静态 HTML、路径库归档、免费不�
 ## 状态探测（发布前）
 
 ```bash
-npx wrangler whoami        # 显示账号 = 已登录；否则提示先 wrangler login
+npx wrangler whoami        # 显示账号 = 已登录；未登录则停，把 wrangler login 交给用户
+npx wrangler pages project list   # 已有路径库项目？接到同一个 --project-name
 git remote -v              # 有 remote 且要 push 触发 → 走 C（Git 集成）
 ```
 
+- `wrangler login` 是交互式的，不要替用户跑。
 - 要 agent 直接发 → 走 A（Wrangler CLI）。
 - 用户只肯用浏览器 → 走 B（控制台上传）。
 
@@ -29,18 +31,20 @@ git remote -v              # 有 remote 且要 push 触发 → 走 C（Git 集�
 ## A. Wrangler CLI（agent 可执行的主路径）
 
 ```bash
-npm i -g wrangler          # 或全程用 npx wrangler，免去全局安装
-wrangler login             # 浏览器授权；CI 改用带 Pages 权限的 API token（CLOUDFLARE_API_TOKEN）
+# 全程用 npx wrangler 即可，不必全局安装
+# 未登录则停，把下一行交给用户：npx wrangler login
+# CI 改用带 Pages 权限的 API token（CLOUDFLARE_API_TOKEN）
 
-# 路径库 = 整棵树反复部署进同一个 project
-wrangler pages deploy ./site --project-name=ai-docs
+# 首次：先非交互建项目，避免 deploy 卡在「要不要创建」提示
+npx wrangler pages project create ai-docs --production-branch=main
+npx wrangler pages deploy ./site --project-name=ai-docs
 ```
 
 - 执行前先过 SKILL 的「发布门槛」：`*.pages.dev` 公开可访问——亮出部署目录文件清单、查敏感内容、用户确认后再跑。
-- 项目不存在时，首次部署会提示创建。
-- 预期生产 URL：`https://<project-name>.pages.dev`（每次部署另有部署级预览 URL）。
+- 项目已存在就跳过 `project create`，只跑 `pages deploy`（`project list` 对得上名字即可）。
+- 预期生产 URL：`https://<project-name>.pages.dev`（每次部署另有部署级预览 URL）。文档在 `/d/<id>/`。
 - 分支预览：加 `--branch=staging`，在同一项目内产生非生产预览。
-- 更新文档 = 改完 `./site` 后原样重跑同一命令；不要新建项目。
+- 更新文档 = 改完 `./site` 后原样重跑同一条 `pages deploy`；不要新建项目。
 
 ## B. 控制台上传（浏览器一次性）
 
@@ -57,9 +61,9 @@ wrangler pages deploy ./site --project-name=ai-docs
 2. 框架预设：无 / 静态。若 HTML 已构建好，构建命令留空。输出目录 = 含 `index.html` 的文件夹（如 `/` 或 `site`）。
 3. 推送到生产分支即可重新部署；其他分支自动出预览。
 
-## 路径库（多文档时必用）
+## 路径库（长期 / AI 文档：第一份就起铺）
 
-只保留一个 Pages 项目。布局：
+只保留一个 Pages 项目。第一份 HTML 也放进 `d/<id>/`，不要铺在项目根上——根路径 URL 一旦分享出去，再改形状就会断。布局：
 
 ```text
 site/

@@ -76,13 +76,15 @@ jobs:
 **高风险，先过 SKILL 的「发布门槛」**：`git add .` 会把当前目录**所有**文件收进提交，`--public` 让仓库全网可见——免费 Pages 没有私有选项。先 `git status` 亮清单、查敏感文件，用户明确确认后再执行。
 
 ```bash
-gh auth login          # 仅首次
+# 未登录则停，把下一行交给用户：gh auth login
 git init && git add . && git commit -m "Initial commit"
 gh repo create <repo-name> --public --source=. --push
 
 OWNER=$(gh api user --jq '.login')
-gh api repos/$OWNER/<repo-name>/pages -X POST \
-  -f build_type=legacy -f source='{"branch":"main","path":"/"}'
+# source 必须是对象。-f source='{"branch":...}' 会把 JSON 当字符串发出去，API 422。
+gh api repos/$OWNER/<repo-name>/pages -X POST --input - <<'EOF'
+{"build_type":"legacy","source":{"branch":"main","path":"/"}}
+EOF
 
 # 把 live URL 写回仓库 About 栏（可选但好用）
 gh api --method PATCH repos/$OWNER/<repo-name> \
@@ -115,6 +117,7 @@ Settings → Pages → Custom domain → 按文档配 DNS（A/ALIAS/CNAME）。D
 - 承诺硬性无限带宽。
 - 项目站里写绝对路径资源引用（base path 会咬人）。
 - 未经用户确认就 `git add .` + `gh repo create --public --push`——整个目录被公开，事后删除也难收回。
+- 用 `-f source='{"branch":"main","path":"/"}'` 开 Pages——`source` 会变成字符串，API 拒收。
 
 ## 延伸（可选，默认零依赖）
 

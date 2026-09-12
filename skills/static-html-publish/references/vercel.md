@@ -17,6 +17,7 @@ vercel whoami 2>/dev/null                 # CLI 已登录?
 ```
 
 - 三个都查完再选路径（见下表）。**不要**在未 link 的目录里用 `vercel link` / `vercel ls` / `vercel project inspect` 来探测状态——它们会交互式提示，甚至静默 link 产生副作用；只有 `vercel whoami` 到处安全。
+- `vercel login` 是交互式的，未登录就停，把命令交给用户。
 - `.vercel/` 是 link 状态文件，不要提交进 git（加进 `.gitignore`）。
 
 ## 发布模型（先选一条）
