@@ -222,3 +222,4 @@ __marimo__/
 .claude/
 .agents/
 .codex/
+*-workspace/

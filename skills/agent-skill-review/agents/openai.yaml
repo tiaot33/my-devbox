@@ -1,0 +1,7 @@
+interface:
+  display_name: "Agent Skill Review"
+  short_description: "Review existing Agent Skills for spec, trigger, structure, and readiness issues"
+  default_prompt: "Use $agent-skill-review to review this existing Agent Skill. Check spec compliance, trigger quality, structure and responsibility boundaries, bundled reference clarity, dependency/install readiness, and eval readiness. Keep the output review-first and findings-first."
+
+policy:
+  allow_implicit_invocation: true

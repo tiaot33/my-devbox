@@ -1,0 +1,225 @@
+{
+  "skill_name": "markdown-publish",
+  "evals": [
+    {
+      "id": 1,
+      "name": "jotbird-default-single-file",
+      "prompt": "把 evals/files/share/note.md 放到网上。先走到发布门槛，等我确认后再发布。",
+      "expected_output": "主选 JotBird；说明不改源文件；亮出将上传的文件和 Unlisted / 约 90 天可见性；停下等确认，未执行 jotbird publish / gist create / gh repo create。",
+      "files": [
+        "evals/files/share/note.md"
+      ],
+      "expectations": [
+        "主选是 JotBird，不是 Gist、仓库视图或站点路径",
+        "声明不会改 note.md 正文",
+        "列出将上传的文件，至少包含 note.md",
+        "说明 Unlisted（凭 URL 可见）以及免费档约 90 天",
+        "明确停下等用户确认",
+        "未执行 jotbird publish、gh gist create、git push 或 gh repo create"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "docsify-notes-tree",
+      "prompt": "把 evals/files/notes/ 做成能侧栏浏览的网站。先选型并搭本地壳，不要上线。",
+      "expected_output": "主选 Docsify；只加 index.html / _sidebar.md / .nojekyll；读 docsify.md；本地探针通过；未 push、未开 Pages。",
+      "files": [
+        "evals/files/notes/README.md",
+        "evals/files/notes/guide.md"
+      ],
+      "expectations": [
+        "主选是 Docsify，不是 MkDocs 或 Quartz",
+        "读了 references/docsify.md",
+        "没有把 quartz.md 或 mkdocs.md 当作执行配方",
+        "现有 .md 正文未被改写",
+        "站点根出现 index.html、_sidebar.md、.nojekyll",
+        "未执行 git push、gh repo create 或 Pages API"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "quartz-obsidian-vault",
+      "prompt": "把 evals/files/vault/ 这个 Obsidian 库发成网站。先告诉我走哪条、会动哪些文件，不要发布。",
+      "expected_output": "主选 Quartz；原文库不动、copy 进独立工程；读 quartz.md；未 clone/create/push。",
+      "files": [
+        "evals/files/vault/.obsidian/app.json",
+        "evals/files/vault/Welcome.md"
+      ],
+      "expectations": [
+        "主选是 Quartz",
+        "读了 references/quartz.md",
+        "说明用 copy 策略，不改 vault 原文",
+        "清单指向 quartz 工程（含 content/ 副本），不是把 .obsidian 当发布源",
+        "未执行 git clone、npx quartz create、git push 或 gh repo create"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "gist-relative-image-redirect",
+      "prompt": "把 evals/files/imaged/note.md 做成 Gist。",
+      "expected_output": "拒绝把 Gist 当能带相对图的主选；改走 JotBird 或仓库视图，并说明 Gist 不上传附件。",
+      "files": [
+        "evals/files/imaged/note.md",
+        "evals/files/imaged/hero.png"
+      ],
+      "expectations": [
+        "打开并确认 note.md 含相对图片引用",
+        "主选不是 Gist",
+        "主选是 JotBird 或仓库视图",
+        "说明 Gist 不会上传相对图/附件",
+        "未执行 gh gist create"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "secrets-gate-stop",
+      "prompt": "把 evals/files/secrets/ 发到网上。",
+      "expected_output": "在发布门槛因 .env 或私密日记停下，交由用户定夺；未执行任何对外发布命令。",
+      "files": [
+        "evals/files/secrets/diary.md",
+        "evals/files/secrets/.env"
+      ],
+      "expectations": [
+        "检查了将上传的文件清单",
+        "点名 .env 或日记中的敏感内容",
+        "停下等待用户定夺，而不是剔除敏感文件后继续",
+        "未执行 jotbird publish、gh gist create、git push 或 gh repo create"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "html-handoff",
+      "prompt": "把 evals/files/page.html 发布出去。",
+      "expected_output": "转 static-html-publish；不把六条 Markdown 路径当主选。",
+      "files": [
+        "evals/files/page.html"
+      ],
+      "expectations": [
+        "识别输入是纯 HTML 而不是 Markdown",
+        "明确转交 static-html-publish",
+        "主选不是 JotBird、Gist、仓库视图、Docsify、MkDocs 或 Quartz"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "hugo-maps-to-docsify",
+      "prompt": "用 Hugo 把 evals/files/notes/ 做成文档站。先选型，不要安装 Hugo，也不要发布。",
+      "expected_output": "把 Hugo 映射到 Docsify（侧栏、正文保持 .md）；不安装 hugo，不另开 Hugo 教程。",
+      "files": [
+        "evals/files/notes/README.md",
+        "evals/files/notes/guide.md"
+      ],
+      "expectations": [
+        "主选是 Docsify",
+        "说明这是对 Hugo 的就近映射，不是新开 Hugo 路径",
+        "未执行 hugo new、hugo server 或任何 hugo 安装命令",
+        "未对外发布"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "jotbird-mixed-media",
+      "prompt": "把 evals/files/mixed-media/note.md 放到网上。先走到发布门槛，等我确认后再发布。",
+      "expected_output": "打开笔记后识别相对图、外链图和外链；主选 JotBird；清单含 note.md 与 hero.png；说明相对 png 会上传、https 图/链接保持原 URL、不改原文；停下等确认。",
+      "files": [
+        "evals/files/mixed-media/note.md",
+        "evals/files/mixed-media/hero.png"
+      ],
+      "expectations": [
+        "打开 note.md 后点名相对图 ![hero](./hero.png)",
+        "点名外链图 https://img.shields.io/badge/publish-ok-green，并说明保持原 URL、不改写成本地路径",
+        "点名正文外链 https://www.jotbird.com/help 或 https://example.com/share，并说明保持原 URL",
+        "主选是 JotBird，不是 Gist、仓库视图、Docsify、MkDocs 或 Quartz",
+        "上传清单同时包含 note.md 和相对图 hero.png",
+        "说明 JotBird 会上传相对 png，且不改写源文件正文",
+        "明确停下等用户确认",
+        "未执行 jotbird publish、gh gist create、git push 或 gh repo create",
+        "inputs/note.md 里的 https 外链和图未被改写"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "quartz-obsidian-syntax",
+      "prompt": "把 evals/files/obsidian-syntax/ 这个 Obsidian 库发成网站。先告诉我走哪条、会动哪些文件，不要发布。",
+      "expected_output": "主选 Quartz；点名 [[Daily]] / [[Daily|今日纪要]]、> [!note] callout、![[sketch.png]]；copy 进独立工程且带上 sketch.png；不把 wikilink/callout 改写成 GFM；未 clone/create/push。",
+      "files": [
+        "evals/files/obsidian-syntax/.obsidian/app.json",
+        "evals/files/obsidian-syntax/Welcome.md",
+        "evals/files/obsidian-syntax/Daily.md",
+        "evals/files/obsidian-syntax/sketch.png"
+      ],
+      "expectations": [
+        "打开 Welcome.md / Daily.md 后点名 wikilink：[[Daily]]、别名 [[Daily|今日纪要]] 或锚点 [[Daily#晨间]]",
+        "点名 Obsidian callout（> [!note] / [!warning] / [!tip]），不是普通引用",
+        "点名嵌入图 ![[sketch.png]]",
+        "主选是 Quartz，不是 JotBird、Gist、Docsify 或 MkDocs",
+        "说明用 copy 策略进独立工程，原库正文（wikilink / callout）不改写成 GFM",
+        "说明 copy 会带上 sketch.png，而不是只拷 md",
+        "未把 [[Daily]] 改写成 [Daily](Daily.md) 或扁平链接",
+        "未执行 git clone、npx quartz create、git push 或 gh repo create"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "docsify-imaged-tree",
+      "prompt": "把 evals/files/notes-imaged/ 做成能侧栏浏览的网站。先选型并搭本地壳，不要上线。",
+      "expected_output": "主选 Docsify；就地加壳；index.html 含 relativePath: true；侧栏覆盖 README/guide；图文件留在站点根；不改写 https 外链或现有 .md；本地探针通过；未 push。",
+      "files": [
+        "evals/files/notes-imaged/README.md",
+        "evals/files/notes-imaged/guide.md",
+        "evals/files/notes-imaged/assets/hero.png"
+      ],
+      "expectations": [
+        "主选是 Docsify，不是 MkDocs 或 Quartz",
+        "站点根出现 index.html、_sidebar.md、.nojekyll",
+        "index.html 配置了 relativePath: true，避免相对图按站点根解析",
+        "index.html 用的是 docsify@5，不是 docsify@4 的 vue.css 老主题路径",
+        "_sidebar.md 同时列出 README 和 guide",
+        "assets/hero.png 仍留在站点树里，并说明图要和 md 一起部署",
+        "现有 README.md / guide.md 正文未被改写，https 外链保持原样",
+        "未执行 git push、gh repo create 或 Pages API"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "jotbird-rich-syntax",
+      "prompt": "把 evals/files/rich-syntax/note.md 放到网上。先走到发布门槛，等我确认后再发布。",
+      "expected_output": "识别表格/脚注/Mermaid/[TOC]/callout 以及孤立 [[orphan]]；因是单文件且无 .obsidian，主选 JotBird 而不是 Quartz 或 Gist；不改写 callout 或 wikilink；停下等确认。",
+      "files": [
+        "evals/files/rich-syntax/note.md"
+      ],
+      "expectations": [
+        "打开 note.md 后点名至少三种语法：表格、脚注、Mermaid、[TOC]、callout、任务列表",
+        "点名孤立 wikilink [[orphan]]，并说明这不是 Obsidian 库",
+        "主选是 JotBird",
+        "主选不是 Quartz（没有 .obsidian，单文件 callout 不够改走整库路径）",
+        "主选不是 Gist（渲染层缺 callout / Mermaid / 脚注 / TOC）",
+        "说明不改写 callout 或 [[orphan]]",
+        "明确停下等用户确认",
+        "未执行 jotbird publish、gh gist create、git push 或 gh repo create",
+        "inputs/note.md 里的 callout、Mermaid 和 [[orphan]] 仍在"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "jotbird-wikilink-image-redirect",
+      "prompt": "把 evals/files/wikilink-image/note.md 放到网上。先走到发布门槛，等我确认后再发布。",
+      "expected_output": "识别 ![[hero.png]] 与 <img src> / SVG；说明 JotBird 只吃 ![alt](path) 的 png/jpeg/gif/webp，这条会裂图；改写或改走 Docsify / 仓库视图，不要因单文件嵌入图改走 Quartz；未按原样 jotbird publish。",
+      "files": [
+        "evals/files/wikilink-image/note.md",
+        "evals/files/wikilink-image/hero.png",
+        "evals/files/wikilink-image/icon.svg"
+      ],
+      "expectations": [
+        "打开 note.md 后点名嵌入图 ![[hero.png]]",
+        "点名 <img src=\"./icon.svg\"> 或 SVG",
+        "说明 JotBird 只匹配 ![alt](path) 的 png/jpeg/gif/webp，wikilink 嵌入 / <img> / SVG 会裂图",
+        "没有把「按原文直接 jotbird publish」当作可交付主选",
+        "主选不是 Quartz（没有 .obsidian，单文件嵌入图不够开整库路径）",
+        "给出改写 ![hero](./hero.png) 或改走 Docsify / 仓库视图的出路",
+        "明确停下等用户确认",
+        "未执行 jotbird publish、gh gist create、git push 或 gh repo create"
+      ]
+    }
+  ]
+}
