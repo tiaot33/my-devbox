@@ -1,0 +1,4 @@
+{
+  "name": "my-devbox",
+  "install": "bash scripts/devbox-init/install.sh --no-agents"
+}
