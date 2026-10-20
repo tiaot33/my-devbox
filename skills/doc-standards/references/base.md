@@ -8,7 +8,6 @@
   - 原样引用的代码、命令、命令输出、日志、错误信息、界面文案：保持原文。
   - 给阅读困难读者的易读版 → `register/easy.md`。ISO 把 plain language 与 easy language 分开处理。
   - 规范性文件的助动词（应、宜、可等）→ `standard.md`
-  - 公文的格式和用语 → `gov-doc.md`
 
 ## 写作规则
 
