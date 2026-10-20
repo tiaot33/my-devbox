@@ -8,13 +8,14 @@
 
 | 层 | 位置 | 只管 | 什么时候新增 |
 | --- | --- | --- | --- |
-| 语体 | `base.md`、`register/`、`easy-read.md` | 句子、用词、术语、情态词、标点数字 | 基本不新增 |
+| 语体 | `base.md`（完整，默认）、`register/concise.md`、`register/easy.md` | 句子、用词、术语、情态词、标点数字 | 基本不新增 |
 | 用途 | `genre/` | 读者读完做什么，决定骨架和顺序 | 基本不新增，六种是封闭集合 |
 | 内容块 | `blocks/` | 一种内容单元的写法，如步骤、图表、引用 | 同一套写法在两类以上文档里重复出现时 |
 | 类型 | `references/*.md` | 外部标准、接收方或法律规定的结构和格式 | 有标准规定结构，且用途 + 语体写不出合格文档时 |
 
 - 想加新类型前，先试"用途 + 语体 + 块"能不能写出来；能，就不加类型文件。
-- 类型文件里和别的类型共用的写法，抽到 `blocks/`，原处留一行"见 `blocks/x.md`"。已抽出的：`blocks/steps.md`（原 `tutorial.md`"步骤（两类共用）"，`user-manual.md`、`test-docs.md` 也引用它）；`blocks/code-sample.md`（合并自 `readme.md`、`api-reference.md` 的代码示例规则和 `steps.md` 的命令规则）；`blocks/traceability.md`（合并自 `requirements.md`、`design.md`、`test-docs.md`）；`blocks/gbt7713-7714.md`（合并自 `tech-report.md`、`thesis.md` 共用的 GB/T 7713/7714 写法）。
+- 类型文件可以点名 `genre/` 文件，让某类文档另按某个用途写；章节骨架仍以类型文件为准，用途文件只补写作规则。
+- 类型文件里和别的类型共用的写法，抽到 `blocks/`，原处留一行"见 `blocks/x.md`"。已抽出的：`steps`（编号步骤）、`code-sample`（命令与代码示例）、`figure-table`（图、表、公式）、`citation`（引用来源）、`traceability`（需求追溯）、`gbt7713-7714`（GB/T 7713/7714 共用写法）、`warning`（警告与风险提示）、`decision`（决策与选项）、`revision`（修订与变更说明）。每个块合并自哪些文件，见 `skills/doc-standards-workspace/sources.md`。
 - 用途文件的骨架：判定（读者读完做什么、典型文档、容易混淆的去哪）、结构、写作规则、要读的内容块、审查清单。"要读的内容块"写明必读还是按条件读。
 - `blocks/` 文件的骨架：适用、写作规则、审查清单。
 - 语体文件只写对 `base.md` 的放宽或收紧，用对照表列出放宽了哪几条、哪几条不放宽。

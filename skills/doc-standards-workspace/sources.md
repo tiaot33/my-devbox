@@ -2289,3 +2289,53 @@ ste-zh R n（ste-zh 自定编号，不是 ASD-STE100 条款号）；ste-zh 模�
 - 章节与附录编号：tech-report.md"编号与附录"；thesis.md"编号与版式"。
 - 三处统一（本 skill 自定）：引文标注制式选一种全文统一；引言可以编 0，标题不写"引言"时不编；续表写"续图×""续表×"，表也可以写"表×（续）"。
 - 未合并：长公式换行方向，7713.3 是在符号前换行，7713.1 是在符号后，两者相反，留在各自的文件里。
+
+### 第三批迁移（2026-10-20，四个 Orca worker 执行，协调者验收）
+
+easy-read.md 移到 register/easy.md，内容不变；上文"## easy-read.md"一节的出处适用于 register/easy.md。
+
+**blocks/warning.md**（worker W1 的出处建议，原样收录）
+
+- 写作规则 1、2 与审查清单 1：沿用 base.md"结构"节对应两条的出处（警告位置与两句写法）。
+- 写作规则 3 与审查清单 2：沿用 genre/do.md"写作规则"的"不可逆或有风险的操作"条和 tutorial.md"教程"的"让步骤可以重复执行"条的出处。
+- "实体产品的安全信息另按 user-manual.md"：路由说明，无需出处。
+
+**blocks/decision.md**（worker W2 的出处建议，原样收录）
+
+`blocks/decision.md` 各条沿用出处：
+
+- 一条决策·问题、选定项、理由、代价与后果、关联需求/关注点：design.md"决策"（理由、编号）；architecture.md"架构决策"（理由要点、关联的关注点、备选方案的后果）。
+- 一条决策·备选方案和取舍写在决策旁：design.md"决策"。
+- 一条决策·状态：合成，据 design.md"决策"（"本级不作决策，见……"）和 genre/decide.md"风险与未决事项"（由谁、何时弄清）。作者判断。
+- 类型文件规定列时按类型文件：本 skill 自定（分层规则）。
+- 选项比较·同一组维度、对比表：genre/decide.md"写作规则"。
+- 选项比较·代价、收益、风险：genre/decide.md"结构 3"。
+- 选项比较·"<条件>时，<结果>"：agent-report.md"选项"。
+- 推荐与事实分开：genre/decide.md"写作规则"。
+- 请读者决定：genre/decide.md"结构 1"；agent-report.md"请求决定"。
+- architecture.md 删除/改引用的图格式句：原出处并入 blocks/figure-table.md"图"的出处；需求链接版本句并入 blocks/citation.md"来源有版本"。
+
+**blocks/revision.md**（worker W3 的出处建议，原样收录）
+
+revision.md 的每条规则沿用原文件同一节的出处：
+- 修订说明何时写、怎么写 → public-notice.md "修订说明和更正"两条的出处。
+- 邮件短信另发一条 → public-notice.md "动笔前"第 3 条的出处。
+- 已发布公告只为更正而改、撤下留说明 → public-notice.md "新闻式公告和媒体声明"前两条的出处。
+- 修订记录每次变更一行 → requirements.md "修订记录"的出处（版本、日期、改了什么、批准人）。
+- 末尾写修订日期不覆盖原文、CHANGELOG 倒序分组 → genre/record.md 对应两条的出处。
+- 编号不重排、删除保留编号 → genre/agree.md 对应条的出处。
+- 审查清单各条 → 对应规则的出处。
+
+**其余类型改为引用块和用途层**（worker W4 的出处建议，原样收录）
+
+- popular-science 图像引用 figure-table：无新出处，沿用 popular-science 原"图像与数据"一节出处；来源条目写年份沿用"科学性"一节原出处。
+- easy-read 图片替代文字：沿用 figure-table 的出处，标"本 skill 自定，跨类型适用"。
+- doc-plan 两条引用行：沿用 figure-table、citation 各自出处，标"本 skill 自定"。
+- lifecycle-other 各"另按 genre/x.md"：标"作者判断，用途归属"；"规格→lookup"、"计划/请求→decide"明确标作者判断；引用文件、规程、记录各条原有出处不变。
+
+**协调者验收时的改动**（均为本 skill 自定）：
+- architecture.md 决策表加"代价与后果"一列，与 blocks/decision.md 对齐。
+- lifecycle-other.md 的"规格"改按 genre/agree.md 写（worker 原选 genre/lookup.md）：规格是要遵守和验收的约束。
+- popular-science.md 的来源列表按"来源与署名"一节写，不另加 blocks/citation.md 的"参考"一节。
+- SKILL.md：任何已读文件按条件点名的块都要读；类型文件点名的 genre/ 文件也要读；指向未收录类型时告诉用户再按用途写。
+- 语义变化：warning 块使"不可逆操作写后果和回退办法"适用于所有含这类操作的文档（原来只在 tutorial、genre/do）；revision 块的批准人改为"需要批准的文档才写"（requirements.md 仍必写）；lifecycle-other 的计划、请求、报告新增 genre/decide.md 的写作规则。
