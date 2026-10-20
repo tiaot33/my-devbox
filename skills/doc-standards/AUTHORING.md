@@ -14,7 +14,7 @@
 | 类型 | `references/*.md` | 外部标准、接收方或法律规定的结构和格式 | 有标准规定结构，且用途 + 语体写不出合格文档时 |
 
 - 想加新类型前，先试"用途 + 语体 + 块"能不能写出来；能，就不加类型文件。
-- 类型文件里和别的类型共用的写法，抽到 `blocks/`，原处留一行"见 `blocks/x.md`"。已抽出的：`blocks/steps.md`（原 `tutorial.md`"步骤（两类共用）"，`user-manual.md`、`test-docs.md` 也引用它）；`blocks/code-sample.md`（合并自 `readme.md`、`api-reference.md` 的代码示例规则和 `steps.md` 的命令规则）。
+- 类型文件里和别的类型共用的写法，抽到 `blocks/`，原处留一行"见 `blocks/x.md`"。已抽出的：`blocks/steps.md`（原 `tutorial.md`"步骤（两类共用）"，`user-manual.md`、`test-docs.md` 也引用它）；`blocks/code-sample.md`（合并自 `readme.md`、`api-reference.md` 的代码示例规则和 `steps.md` 的命令规则）；`blocks/traceability.md`（合并自 `requirements.md`、`design.md`、`test-docs.md`）；`blocks/gbt7713-7714.md`（合并自 `tech-report.md`、`thesis.md` 共用的 GB/T 7713/7714 写法）。
 - 用途文件的骨架：判定（读者读完做什么、典型文档、容易混淆的去哪）、结构、写作规则、要读的内容块、审查清单。"要读的内容块"写明必读还是按条件读。
 - `blocks/` 文件的骨架：适用、写作规则、审查清单。
 - 语体文件只写对 `base.md` 的放宽或收紧，用对照表列出放宽了哪几条、哪几条不放宽。
