@@ -2217,3 +2217,45 @@ ste-zh R n（ste-zh 自定编号，不是 ASD-STE100 条款号）；ste-zh 模�
     | 期刊报道性摘要 | 约 400 字（7713.2 4.2.3；6447 4.2） |
     | 期刊报道-指示性摘要 | 约 300 字（7713.2 4.2.3；6447 4.2） |
     | 期刊指示性摘要 | 约 150 字（7713.2 4.2.3；6447 4.2） |
+
+## 分层试点新增的文件（2026-10-20）
+
+### blocks/steps.md
+
+规则和审查清单原样移自 `tutorial.md`"步骤（两类共用）"，逐条出处见上面 tutorial.md 一节的"写作规则 › 步骤（两类共用）"。"适用"一节是本 skill 自定。
+
+### register/concise.md
+
+本 skill 自定，没有外部标准。放宽对象是 `base.md` 的对应条目；不放宽的几条（事实可追溯、一词一义、受控情态词、警告、标点数字）沿用 `base.md` 的出处。"同一层列表不超过 7 条"是本 skill 自定的阈值。
+
+### blocks/figure-table.md
+
+- 表的用法（比较、清单、条件组合）：据 FPLG III.d.3 推广，见 base.md"版式"。
+- 表题在上、图题在下、图紧跟首次提及：据 GB/T 7713.3 的图表规则推广到一般文档，见 tech-report.md"图、表、公式"。
+- 符号含义和单位写在公式下方：同上。
+- 替代文字写信息、截图不替代文字：本 skill 自定，参考 WCAG 1.1.1 的非文本内容要求（未逐条核对）。
+- 其余（单元格、编号阈值、文本格式图）：本 skill 自定。
+
+### blocks/citation.md
+
+- 链接文字写来源名称：FPLG IV.i，见 base.md"版式"。
+- 在线来源写更新日期或访问日期：沿用 lifecycle-other.md"引用文件"一条。
+- 二手来源写"据 B 转引 A"：沿用本 skill 各类型文件的"据"标注做法。
+- 其余：本 skill 自定。
+
+### genre/*.md
+
+六种用途的划分综合了 Diátaxis（教程、操作、参考、解释）和 ISO/IEC/IEEE 15289:2019 的通用信息项类型（计划、规程、报告、请求、描述、规格、策略、记录），按"读者读完做什么"重新归并，是本 skill 自定。
+- do.md：结构和"原理只留一句"沿用 tutorial.md"操作指南"一节（Diátaxis how-to、Google《过程》）。
+- lookup.md：本 skill 自定，参考 Diátaxis reference。
+- understand.md：结论先行沿用 base.md"结构"（24495-1 5.2.2 a）；其余参考 Diátaxis explanation，本 skill 自定。
+- decide.md：结论和请求在前沿用 agent-report.md（ste-zh 结果汇报模板）；状态词沿用 lifecycle-other.md 报告类"提前 / 按期 / 推迟"的做法；其余本 skill 自定。
+- agree.md：主体 + 条件 + 要求、可判定沿用 lifecycle-other.md 策略类；受控情态词沿用 base.md；其余本 skill 自定。
+- record.md：CHANGELOG 分组参考 Keep a Changelog 1.1.0（未核对原文）；其余本 skill 自定。
+
+### 试点后的修订
+
+- base.md"读者与目的"：由材料直接算出的差值、时长、比例可以写，交付说明注明。本 skill 自定，来自周报试写。
+- blocks/figure-table.md：表前写结论、不写"下表列出……"。本 skill 自定，来自复习笔记和周报试写。
+- genre/decide.md：状态词加"已完成"，已完成事项下一步写"无"。本 skill 自定，来自周报试写。
+- genre/lookup.md："—"与【待补】的分工、不写描述文档本身的话。本 skill 自定，来自复习笔记试写。
