@@ -222,4 +222,5 @@ __marimo__/
 .claude/
 .agents/
 .codex/
-*-workspace/
+**/*-workspace/*
+!skills/doc-standards-workspace/sources.md
