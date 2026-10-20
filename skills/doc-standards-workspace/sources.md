@@ -2259,3 +2259,16 @@ ste-zh R n（ste-zh 自定编号，不是 ASD-STE100 条款号）；ste-zh 模�
 - blocks/figure-table.md：表前写结论、不写"下表列出……"。本 skill 自定，来自复习笔记和周报试写。
 - genre/decide.md：状态词加"已完成"，已完成事项下一步写"无"。本 skill 自定，来自周报试写。
 - genre/lookup.md："—"与【待补】的分工、不写描述文档本身的话。本 skill 自定，来自复习笔记试写。
+
+### blocks/code-sample.md（2026-10-20 合并）
+
+规则合并自三处，出处沿用原处的逐条记录：readme.md"写作规则 › 命令与代码示例"、api-reference.md"写作规则 › 代码示例"、tutorial.md"写作规则 › 步骤（两类共用）"的命令条目。合并时的两处统一是本 skill 自定：
+- 占位符：没有项目约定时用全大写加下划线（原 readme、tutorial 默认尖括号；api-reference 按 Google 用全大写）。理由：尖括号在 shell 里是重定向符。
+- 未实测的示例：只在交付说明里列出（原 api-reference 要求示例后写【待补】，readme 要求只写交付说明）。
+
+### 第一批迁移后的修订（2026-10-20）
+
+- base.md：推断内容也写【待补】、不另造标记。本 skill 自定，来自 user-manual 回归。
+- user-manual.md：严重程度未知时按最坏可信后果选信号词并留【待补】。本 skill 自定，偏保守的默认做法；ISO 3864-2、ANSI Z535.6 都按伤害严重程度选信号词，未规定信息缺失时怎么办。
+- blocks/code-sample.md：声明块和路径模板不受"可复制"规则约束。沿用 api-reference.md 原有"语法格式写在'声明或语法'一节"的做法。
+- readme.md：示例占位符改为全大写写法，与 blocks/code-sample.md 一致。
