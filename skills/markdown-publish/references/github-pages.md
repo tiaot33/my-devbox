@@ -12,7 +12,7 @@ REPO=$(gh repo view --json name -q .name)
 BRANCH=$(git branch --show-current)
 ```
 
-还没有 GitHub 仓库时，过门槛后再：
+还没有 GitHub 仓库时，过门槛后再。若 `git rev-parse --show-toplevel` 指向当前目录的父级，不要在这里再 `git init`；用已有仓推，或把 Pages 源指到该仓的 `/` / `/docs`。在全新目录 init 时写入 `.gitignore`（至少 `.DS_Store`），再 add / commit，然后：
 
 ```bash
 gh repo create <repo-name> --public --source=. --remote=origin --push
@@ -24,13 +24,14 @@ GitHub REST 要的是嵌套对象 `source: {branch, path}`。`gh api -f source='
 
 ```bash
 set_pages_source() {   # 用法: set_pages_source <branch> </ 或 /docs>
-  local branch="$1" path="$2" method=POST
+  # 不要命名为 path：zsh/bash 里 path ≡ PATH，gh 会找不到
+  local branch="$1" pages_path="$2" method=POST
   gh api "repos/$OWNER/$REPO/pages" >/dev/null 2>&1 && method=PUT
   gh api "repos/$OWNER/$REPO/pages" -X "$method" \
     -f build_type=legacy \
     -f "source[branch]=$branch" \
-    -f "source[path]=$path"
-  echo "pages source: $branch $path ($method)"
+    -f "source[path]=$pages_path"
+  echo "pages source: $branch $pages_path ($method)"
 }
 ```
 

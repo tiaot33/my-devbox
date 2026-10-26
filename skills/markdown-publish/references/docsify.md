@@ -38,10 +38,14 @@ git remote get-url origin 2>/dev/null
     <script>
       window.$docsify = {
         name: "Notes",
+        nameLink: "/",
         loadSidebar: true,
         relativePath: true,
         subMaxLevel: 3,
-        homepage: "README.md"
+        homepage: "README.md",
+        alias: {
+          "/.*/_sidebar.md": "/_sidebar.md"
+        }
       };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/docsify@5"></script>
@@ -55,27 +59,44 @@ git remote get-url origin 2>/dev/null
 
 `.nojekyll`：空文件。GitHub Pages 否则会丢掉 `_sidebar.md`。
 
-`_sidebar.md`：按站点根生成扁平列表：
+`_sidebar.md`：链接一律 `/` 开头的站点根路径。有子目录就按文件夹分组，章节行链到该章第一篇（纯文本章节名会被当成 `章/README`）。取正文第一个 `# 标题` 作显示名：
 
 ```bash
 python3 - <<'PY'
 from pathlib import Path
 root = Path(".")
-lines = []
-readme = root / "README.md"
-if readme.exists():
-    lines.append("- [Home](README.md)")
-for p in sorted(root.rglob("*.md")):
-    if p.name.startswith("_") or p.name == "README.md":
+
+def heading(p: Path) -> str:
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+        s = line.strip()
+        if s.startswith("# "):
+            return s[2:].strip()
+    return p.stem
+
+def articles(d: Path):
+    return sorted(
+        p for p in d.glob("*.md")
+        if not p.name.startswith("_") and p.name != "README.md"
+    )
+
+lines = ["- [Home](/README.md)"] if (root / "README.md").exists() else []
+for p in articles(root):
+    lines.append(f"- [{heading(p)}](/{p.name})")
+for d in sorted(p for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")):
+    files = articles(d)
+    if not files:
         continue
-    rel = p.as_posix()
-    lines.append(f"- [{p.stem}]({rel})")
+    first = files[0].relative_to(root).as_posix()
+    lines.append(f"- [{d.name}](/{first})")
+    for p in files:
+        rel = p.relative_to(root).as_posix()
+        lines.append(f"  - [{heading(p)}](/{rel})")
 Path("_sidebar.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 print(f"wrote {len(lines)} sidebar entries")
 PY
 ```
 
-`relativePath: true` 是硬要求：默认按站点根解析，会把用户原来的相对链接/图片弄断。图文件必须和 `.md` 一起进站点根再部署，不要只推 md。项目站（`/<repo>/`）不要写以 `/` 开头的图路径，会打到域根 404。外链图可以。
+`relativePath: true` 只解析**正文**里的相对链接/图片。壳链接（侧栏、自己写的首页 TOC）写成 `/章/篇.md`：hash 路由下这是 `#/章/篇`，不是域根 HTTP。图的 `src` 才是真实 HTTP——项目站（`/<repo>/`）用相对路径，图文件和 `.md` 一起进站点根再部署。外链图可以。
 
 ## 本地预览
 
@@ -85,10 +106,11 @@ sleep 1
 curl -s http://127.0.0.1:3000/ | grep -c 'docsify@5'      # 壳在
 curl -sI -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/_sidebar.md   # 200
 curl -sI -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/README.md     # 200（或你的 homepage）
-kill "$(cat /tmp/docsify.pid)"
+bad=$(command grep -E '^\s*- \[.*\]\([^)]+\)' _sidebar.md | command grep -vE '\]\(/' || true)
+[ -z "$bad" ] || { echo "FAIL: sidebar link not root-absolute"; echo "$bad"; }
 ```
 
-无头环境验不了 JS 渲染，三条 200 + 侧栏条目数 > 0 就算壳没写错；有浏览器工具时再截一张首页。完成标准：三个探针通过。再谈上线。
+三条 200、侧栏条目 > 0、侧栏 markdown 链接全是 `/` 开头。有子目录时再点一次路由：从章 A 一篇点到章 B，`location.hash` 是 `#/章B/…`，不能含章 A。有浏览器工具就点；否则用系统 Chrome + `puppeteer-core` 点侧栏文本。扁平目录（所有 `.md` 都在站点根）到 `/` 检查即可，然后 `kill "$(cat /tmp/docsify.pid)"`。再谈上线。
 
 ## 上线
 
@@ -96,7 +118,7 @@ kill "$(cat /tmp/docsify.pid)"
 
 读 [github-pages.md](github-pages.md)：先定义 `set_pages_source`，再跑 **A. 分支 + 目录**，最后验链。
 
-预期 URL：`https://<owner>.github.io/<repo>/`（hash 路由，如 `/#/guide`）。Pages 只返回静态文件，`curl` 200 只证明 `index.html` 在线；再 `curl -sI "${URL}_sidebar.md"` 看 200，证明 `.nojekyll` 生效、下划线文件没被 Jekyll 吃掉。
+预期 URL：`https://<owner>.github.io/<repo>/`（hash 路由，如 `/#/guide`）。Pages 只返回静态文件，`curl` 200 只证明 `index.html` 在线；再 `curl -sI "${URL}_sidebar.md"` 看 200，证明 `.nojekyll` 生效。轮询到线上 `_sidebar.md` 链接已是 `/` 开头、`index.html` 含 `alias`（CDN 可能先吐旧壳）。有子目录则对线上 URL 再做一次跨章点击，hash 仍不得叠目录。
 
 ## 限制（只在相关时说）
 

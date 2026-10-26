@@ -33,6 +33,7 @@
         "没有把 quartz.md 或 mkdocs.md 当作执行配方",
         "现有 .md 正文未被改写",
         "站点根出现 index.html、_sidebar.md、.nojekyll",
+        "_sidebar.md 里的 markdown 链接以 / 开头",
         "未执行 git push、gh repo create 或 Pages API"
       ]
     },
@@ -174,7 +175,7 @@
         "站点根出现 index.html、_sidebar.md、.nojekyll",
         "index.html 配置了 relativePath: true，避免相对图按站点根解析",
         "index.html 用的是 docsify@5，不是 docsify@4 的 vue.css 老主题路径",
-        "_sidebar.md 同时列出 README 和 guide",
+        "_sidebar.md 同时列出 README 和 guide，且链接以 / 开头",
         "assets/hero.png 仍留在站点树里，并说明图要和 md 一起部署",
         "现有 README.md / guide.md 正文未被改写，https 外链保持原样",
         "未执行 git push、gh repo create 或 Pages API"
@@ -219,6 +220,25 @@
         "给出改写 ![hero](./hero.png) 或改走 Docsify / 仓库视图的出路",
         "明确停下等用户确认",
         "未执行 jotbird publish、gh gist create、git push 或 gh repo create"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "docsify-nested-tree",
+      "prompt": "把 evals/files/notes-nested/ 做成能侧栏浏览的网站。先选型并搭本地壳，不要上线。",
+      "expected_output": "主选 Docsify；就地加壳；_sidebar.md 按子目录分组且链接以 / 开头；index.html 含 alias 与 relativePath: true；本地探针通过；未 push。",
+      "files": [
+        "evals/files/notes-nested/01-intro/hello.md",
+        "evals/files/notes-nested/02-next/world.md"
+      ],
+      "expectations": [
+        "主选是 Docsify，不是 MkDocs 或 Quartz",
+        "站点根出现 index.html、_sidebar.md、.nojekyll",
+        "_sidebar.md 按 01-intro / 02-next 分组，章节行链到该章第一篇，不是无链接纯文本",
+        "_sidebar.md 里的 markdown 链接以 / 开头（例如 /01-intro/hello.md），不是 01-intro/hello.md",
+        "index.html 含 alias '/.*/_sidebar.md' 和 relativePath: true",
+        "现有 hello.md / world.md 正文未被改写",
+        "未执行 git push、gh repo create 或 Pages API"
       ]
     }
   ]

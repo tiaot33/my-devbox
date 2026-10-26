@@ -56,7 +56,7 @@ JotBird CLI **只读** `~/.config/jotbird/credentials`，不读 `JOTBIRD_API_KEY
 | **JotBird** | `![alt](path)` 的 png/jpeg/gif/webp（≤10MB） | `![[wikilink]]` / `<img>` → 先改成 `![alt](path)`；**SVG 改不成**。不是 vault 不要为了救图改走 Quartz，改 Docsify 或仓库视图 |
 | **Gist** | 不跟 | 有相对图 → JotBird 或仓库视图 |
 | **仓库视图** | 和 `.md` 一起进仓的相对路径 | 本机绝对路径先改相对 |
-| **Docsify** | 图文件和 `.md` 一起部署；`relativePath: true` | 只传 md → 把附件一并纳入 |
+| **Docsify** | 图文件和 `.md` 一起部署 | 只传 md → 把附件一并纳入 |
 | **MkDocs** | 图在 `docs_dir` 内 | 图在外面 → 移入或改 `docs_dir` |
 | **Quartz** | copy 进库的 `![]` 与 `![[image]]` | 图不在被 copy 的库里 → 先放进库 |
 
